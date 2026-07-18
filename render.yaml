@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: tiktok-battle-arena
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server/index.js
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: TOTP_SECRET
+        sync: false
