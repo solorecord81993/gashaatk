@@ -1,0 +1,13 @@
+{
+  "name": "TikTok Like Battle Arena",
+  "short_name": "Battle Arena",
+  "start_url": "/arena",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0620",
+  "theme_color": "#0b0620",
+  "icons": [
+    { "src": "/icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
