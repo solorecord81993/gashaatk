@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>TikTok Like Battle Arena</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Battle Arena">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&family=M+PLUS+Rounded+1c:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#0b0620; --night2:#1a1040; --neon-pink:#ff3d8b; --neon-cyan:#31e6ff;
+    --gold:#ffd24d; --ink:#f4efff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--night);
+    font-family:'Kanit','M PLUS Rounded 1c',sans-serif;color:var(--ink);
+    user-select:none;-webkit-user-select:none}
+  #stage{position:fixed;inset:0}
+  canvas{display:block}
+
+  /* ---------- top bar ---------- */
+  #topbar{position:fixed;top:0;left:0;right:0;z-index:20;
+    padding:calc(env(safe-area-inset-top) + 6px) 12px 6px;
+    display:flex;justify-content:space-between;align-items:center;
+    background:linear-gradient(180deg,rgba(6,3,18,.92),rgba(6,3,18,0));pointer-events:none}
+  #logo{font-weight:800;font-size:17px;letter-spacing:.5px;
+    background:linear-gradient(90deg,var(--neon-pink),var(--neon-cyan));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 0 18px rgba(255,61,139,.35)}
+  #langSwitch{display:flex;gap:4px;pointer-events:auto}
+  #langSwitch button{font-family:inherit;font-weight:600;font-size:12px;color:#cbb8ff;
+    background:rgba(255,255,255,.07);border:1px solid rgba(203,184,255,.25);
+    border-radius:999px;padding:4px 10px;cursor:pointer}
+  #langSwitch button.on{color:#0b0620;background:var(--neon-cyan);border-color:var(--neon-cyan)}
+
+  /* ---------- like/gift feed ---------- */
+  #feed{position:fixed;right:8px;top:22%;z-index:15;display:flex;flex-direction:column;
+    gap:5px;align-items:flex-end;pointer-events:none;max-width:52vw}
+  .feedItem{font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;
+    background:rgba(10,5,30,.72);border:1px solid rgba(49,230,255,.35);
+    animation:feedIn .3s ease-out;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .feedItem.gift{border-color:var(--gold);color:var(--gold);box-shadow:0 0 12px rgba(255,210,77,.35)}
+  .feedItem.fade{opacity:0;transition:opacity .8s}
+  @keyframes feedIn{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+
+  /* ---------- MC bar ---------- */
+  #mcBar{position:fixed;left:10px;right:10px;z-index:20;
+    bottom:calc(env(safe-area-inset-bottom) + 10px);
+    display:flex;align-items:flex-end;gap:8px;pointer-events:none}
+  #mcFace{width:52px;height:52px;flex:none;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#ff7ab1,var(--neon-pink) 70%);
+    border:2px solid var(--neon-cyan);display:flex;align-items:center;justify-content:center;
+    font-size:26px;box-shadow:0 0 16px rgba(49,230,255,.45)}
+  #mcFace.talking{animation:mcTalk .35s infinite alternate}
+  @keyframes mcTalk{from{transform:scale(1)}to{transform:scale(1.08)}}
+  #mcText{flex:1;background:rgba(12,6,32,.85);border:1px solid rgba(255,61,139,.5);
+    border-radius:14px 14px 14px 4px;padding:9px 13px;font-size:14.5px;line-height:1.35;
+    min-height:44px;box-shadow:0 4px 18px rgba(0,0,0,.45)}
+  #mcName{font-size:10.5px;font-weight:800;color:var(--neon-cyan);letter-spacing:1px;margin-bottom:1px}
+
+  /* ---------- gacha overlay ---------- */
+  #gachaOverlay{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+    flex-direction:column;background:rgba(5,2,16,.55);backdrop-filter:blur(2px)}
+  #gachaOverlay.show{display:flex}
+  #capsule{width:120px;height:120px;position:relative;animation:capDrop .7s cubic-bezier(.3,1.6,.5,1)}
+  #capsule.shake{animation:capShake .12s infinite}
+  #capTop,#capBot{position:absolute;left:0;width:120px;height:60px;transition:transform .35s cubic-bezier(.5,-.6,.5,1.6)}
+  #capTop{top:0;border-radius:60px 60px 0 0;background:linear-gradient(160deg,#ff86b8,var(--neon-pink))}
+  #capBot{bottom:0;border-radius:0 0 60px 60px;background:linear-gradient(20deg,#dfe8ff,#fff)}
+  #capsule.open #capTop{transform:translateY(-70px) rotate(-25deg)}
+  #capsule.open #capBot{transform:translateY(40px) rotate(12deg)}
+  #gachaItem{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);font-size:56px;
+    filter:drop-shadow(0 0 14px rgba(255,255,255,.8));transition:transform .4s cubic-bezier(.3,1.8,.5,1)}
+  #capsule.open #gachaItem{transform:translate(-50%,-58px) scale(1.25)}
+  #gachaLabel{margin-top:66px;text-align:center}
+  #gachaWho{font-size:14px;font-weight:600;color:#cbb8ff}
+  #gachaName{font-size:21px;font-weight:800;margin-top:2px}
+  #gachaTier{display:inline-block;margin-top:5px;font-size:11.5px;font-weight:800;letter-spacing:2px;
+    padding:2px 12px;border-radius:999px;border:1px solid currentColor}
+  @keyframes capDrop{from{transform:translateY(-70vh) rotate(-30deg)}to{transform:none}}
+  @keyframes capShake{0%{transform:rotate(-6deg)}100%{transform:rotate(6deg)}}
+  .tier-common{color:#9fd8ff}.tier-rare{color:#5c8dff}.tier-epic{color:#c65cff}.tier-legendary{color:var(--gold)}
+
+  /* ---------- winner ---------- */
+  #winner{position:fixed;inset:0;z-index:35;display:none;flex-direction:column;align-items:center;
+    justify-content:center;background:radial-gradient(circle,rgba(60,20,90,.75),rgba(5,2,16,.92));text-align:center}
+  #winner.show{display:flex}
+  #winCrown{font-size:76px;animation:crownFloat 1.6s ease-in-out infinite}
+  #winName{font-size:32px;font-weight:800;color:var(--gold);text-shadow:0 0 26px rgba(255,210,77,.7);margin-top:6px}
+  #winTitle{font-size:15px;letter-spacing:4px;color:var(--neon-cyan);font-weight:600}
+  @keyframes crownFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+
+  /* ---------- waiting hint ---------- */
+  #hint{position:fixed;left:0;right:0;top:38%;z-index:10;text-align:center;pointer-events:none;
+    transition:opacity .6s}
+  #hint .h1{font-size:22px;font-weight:800;text-shadow:0 0 22px rgba(49,230,255,.6)}
+  #hint .h2{font-size:14px;color:#cbb8ff;margin-top:6px}
+  #hint.off{opacity:0}
+
+  /* ---------- start overlay ---------- */
+  #startOverlay{position:fixed;inset:0;z-index:50;background:var(--night);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+  #startLogo{font-size:30px;font-weight:800;text-align:center;line-height:1.25;
+    background:linear-gradient(90deg,var(--neon-pink),var(--gold),var(--neon-cyan));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  #startBtn{font-family:inherit;font-size:20px;font-weight:800;color:#0b0620;
+    background:linear-gradient(90deg,var(--neon-cyan),#7cf5ff);border:none;border-radius:999px;
+    padding:16px 54px;cursor:pointer;box-shadow:0 0 34px rgba(49,230,255,.55);
+    animation:pulse 1.6s infinite}
+  #startNote{font-size:12.5px;color:#8f7fc0;text-align:center;padding:0 30px;line-height:1.6}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+
+  .shakeScreen{animation:scrShake .45s}
+  @keyframes scrShake{0%,100%{transform:none}20%{transform:translate(-9px,5px)}40%{transform:translate(8px,-6px)}
+    60%{transform:translate(-6px,-4px)}80%{transform:translate(5px,6px)}}
+  #flash{position:fixed;inset:0;z-index:28;background:#fff;opacity:0;pointer-events:none;transition:opacity .5s}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="flash"></div>
+
+<div id="topbar">
+  <div id="logo">⚡ LIKE BATTLE ARENA</div>
+  <div id="langSwitch">
+    <button data-lang="th">ไทย</button>
+    <button data-lang="en">EN</button>
+    <button data-lang="ja">日本</button>
+  </div>
+</div>
+
+<div id="feed"></div>
+
+<div id="hint">
+  <div class="h1" data-i18n="hintTitle"></div>
+  <div class="h2" data-i18n="hintSub"></div>
+</div>
+
+<div id="mcBar">
+  <div id="mcFace">🎙️</div>
+  <div id="mcText"><div id="mcName">MC</div><div id="mcMsg"></div></div>
+</div>
+
+<div id="gachaOverlay">
+  <div id="capsule">
+    <div id="capBot"></div><div id="capTop"></div>
+    <div id="gachaItem"></div>
+  </div>
+  <div id="gachaLabel">
+    <div id="gachaWho"></div>
+    <div id="gachaName"></div>
+    <div id="gachaTier"></div>
+  </div>
+</div>
+
+<div id="winner">
+  <div id="winCrown">👑</div>
+  <div id="winTitle" data-i18n="winnerTitle"></div>
+  <div id="winName"></div>
+</div>
+
+<div id="startOverlay">
+  <div id="startLogo">⚡ TIKTOK LIKE<br>BATTLE ARENA</div>
+  <button id="startBtn" data-i18n="startBtn"></button>
+  <div id="startNote" data-i18n="startNote"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+/* ================= i18n ================= */
+const I18N = {
+  th: {
+    startBtn: 'เริ่มถ่ายทอด!', startNote: 'แตะปุ่มเพื่อเปิดเสียง MC และกันหน้าจอดับ\nจากนั้นเปิดไลฟ์ TikTok แบบแชร์หน้าจอได้เลย',
+    hintTitle: '💗 กดไลค์ครบ {n} ครั้ง รับตัวละคร!', hintSub: 'ส่งของขวัญ = สุ่มกาชาปองระดับพิเศษทันที',
+    winnerTitle: 'ผู้ชนะ', mcName: 'MC',
+    tier: { common: 'COMMON', rare: 'RARE', epic: 'EPIC', legendary: 'LEGENDARY' },
+    items: { shield1:'โล่ป้องกัน 1 ครั้ง', shield3:'โล่ป้องกัน 3 ครั้ง', healSmall:'ยาฟื้นฟูเล็ก +10',
+      healBig:'ยาฟื้นฟูใหญ่ +30', specLight:'สเปเชียลเบา', specMid:'สเปเชียลกลาง', specHeavy:'สเปเชียลหนัก',
+      reflect:'กระจกสะท้อนดาเมจ 10 วิ', aoe:'อุกกาบาตถล่มทุกคน', revive:'ชุบชีวิต', ultimate:'อัลติเมทเบรกเกอร์' },
+    mc: {
+      welcome: 'ยินดีต้อนรับนักสู้คนใหม่ คุณ{name} เข้าสู่สนามประลอง!',
+      gachaItem: 'คุณ{name} หมุนกาชาปอง ได้ {item}!',
+      special: 'โอ้โห! คุณ{name} ปล่อยท่าไม้ตายใส่คุณ{target}!',
+      aoe: 'ระวัง! คุณ{name} ปล่อยพลังถล่มทั้งสนาม!',
+      ko: 'คุณ{name} ถูกน็อกเอาต์ ตกรอบไปแล้ว!',
+      inactiveDeath: 'คุณ{name} หายไปไหน! ไม่กดไลค์นานเกินไป ตัวละครสลายแล้ว!',
+      winner: 'จบเกม! ผู้ชนะคือคุณ{name} ยอดนักสู้แห่งไลฟ์นี้!',
+      revive: 'ปาฏิหาริย์! คุณ{name} ฟื้นคืนชีพกลับมาสู้อีกครั้ง!',
+      rules: [
+        'กดไลค์ให้ครบ {spawn} ครั้ง รับตัวละครของคุณมาสู้ได้เลย!',
+        'ไลค์ทุก {gacha} ครั้ง สุ่มกาชาปองรับไอเทมฟรี!',
+        'ส่งของขวัญ ยิ่งแพงยิ่งได้ไอเทมระดับตำนาน!',
+        'อย่าหยุดกดไลค์นะ หยุดเกิน {inactive} วินาที ตัวละครตายทันที!',
+        'ไลค์คือพลัง MP ไว้โจมตี ใครรอดคนสุดท้ายชนะ!'
+      ]
+    }
+  },
+  en: {
+    startBtn: 'START BROADCAST!', startNote: 'Tap to enable MC voice and keep the screen awake,\nthen start your TikTok screen-share live.',
+    hintTitle: '💗 Hit {n} likes to spawn your fighter!', hintSub: 'Send a gift for an instant premium gacha roll',
+    winnerTitle: 'WINNER', mcName: 'MC',
+    tier: { common: 'COMMON', rare: 'RARE', epic: 'EPIC', legendary: 'LEGENDARY' },
+    items: { shield1:'Shield x1', shield3:'Shield x3', healSmall:'Small Heal +10', healBig:'Big Heal +30',
+      specLight:'Light Special', specMid:'Mid Special', specHeavy:'Heavy Special',
+      reflect:'Damage Mirror 10s', aoe:'Meteor Storm', revive:'Revive', ultimate:'Ultimate Breaker' },
+    mc: {
+      welcome: 'Welcome a new fighter — {name} enters the arena!',
+      gachaItem: '{name} rolls the gacha and gets {item}!',
+      special: 'Whoa! {name} unleashes a special attack on {target}!',
+      aoe: 'Watch out! {name} nukes the whole arena!',
+      ko: '{name} is knocked out and eliminated!',
+      inactiveDeath: 'Where did {name} go? No likes for too long — their fighter has vanished!',
+      winner: 'Game over! The winner is {name}, champion of this live!',
+      revive: 'A miracle! {name} has been revived!',
+      rules: [
+        'Tap {spawn} likes to spawn your own fighter!',
+        'Every {gacha} likes rolls a free gacha item!',
+        'Send gifts — the pricier the gift, the more legendary the item!',
+        'Keep liking! Stop for {inactive} seconds and your fighter dies!',
+        'Likes are MP for attacks. Last one standing wins!'
+      ]
+    }
+  },
+  ja: {
+    startBtn: '配信スタート！', startNote: 'タップでMCボイスを有効化し、画面スリープを防ぎます。\nその後、TikTokの画面共有ライブを開始してください。',
+    hintTitle: '💗 いいね{n}回でキャラ誕生！', hintSub: 'ギフトを送ると即プレミアムガチャ！',
+    winnerTitle: '優勝', mcName: 'MC',
+    tier: { common: 'コモン', rare: 'レア', epic: 'エピック', legendary: 'レジェンド' },
+    items: { shield1:'シールド x1', shield3:'シールド x3', healSmall:'小回復 +10', healBig:'大回復 +30',
+      specLight:'ライト必殺技', specMid:'ミドル必殺技', specHeavy:'ヘビー必殺技',
+      reflect:'ダメージ反射 10秒', aoe:'メテオストーム', revive:'リバイブ', ultimate:'アルティメット' },
+    mc: {
+      welcome: '新しいファイター、{name}さんがアリーナに参戦！',
+      gachaItem: '{name}さんがガチャを回して{item}をゲット！',
+      special: 'すごい！{name}さんが{target}さんに必殺技！',
+      aoe: '危ない！{name}さんが全体攻撃を放った！',
+      ko: '{name}さん、ノックアウトで脱落！',
+      inactiveDeath: '{name}さん、どこへ？いいねが止まってキャラが消滅！',
+      winner: 'ゲーム終了！優勝は{name}さん、このライブのチャンピオン！',
+      revive: '奇跡だ！{name}さんが復活！',
+      rules: [
+        'いいねを{spawn}回タップして自分のキャラをゲット！',
+        'いいね{gacha}回ごとに無料ガチャ！',
+        'ギフトを送ろう！高いほどレジェンド級アイテム！',
+        'いいねを止めないで！{inactive}秒止まるとキャラ死亡！',
+        'いいねは攻撃のMP。最後の1人が勝者！'
+      ]
+    }
+  }
+};
+const ITEM_ICONS = { shield1:'🛡️', shield3:'🛡️', healSmall:'💚', healBig:'💖', specLight:'🔥', specMid:'⚡',
+  specHeavy:'☄️', reflect:'🪞', aoe:'🌋', revive:'✨', ultimate:'💥' };
+
+let lang = localStorage.getItem('arenaLang') || 'th';
+let config = null;
+
+function fmt(tpl, params) {
+  return String(tpl).replace(/\{(\w+)\}/g, (_, k) => params && k in params ? params[k] : '');
+}
+function applyLang() {
+  document.querySelectorAll('#langSwitch button').forEach(b => b.classList.toggle('on', b.dataset.lang === lang));
+  const d = I18N[lang];
+  const params = { n: config ? config.likesToSpawn : 50 };
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = fmt(d[el.dataset.i18n] || '', params);
+  });
+  document.getElementById('mcName').textContent = d.mcName;
+}
+document.querySelectorAll('#langSwitch button').forEach(b => b.onclick = () => {
+  lang = b.dataset.lang; localStorage.setItem('arenaLang', lang); applyLang();
+});
+
+/* ================= audio (WebAudio SFX + custom overrides) ================= */
+let AC = null;
+const customAudio = {}; // key -> HTMLAudio
+function unlockAudio() {
+  AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+  if (AC.state === 'suspended') AC.resume();
+}
+function tone(freq, dur, type = 'square', vol = 0.14, slide = 0) {
+  if (!AC) return;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, AC.currentTime);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), AC.currentTime + dur);
+  g.gain.setValueAtTime(vol, AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+  o.connect(g).connect(AC.destination);
+  o.start(); o.stop(AC.currentTime + dur);
+}
+function playCustom(key) {
+  const url = config && config.assets && (key === 'gacha' ? config.assets.sfx.gacha :
+    key === 'basic' ? config.assets.sfx.basic : config.assets.sfx['spec_' + key]);
+  if (url) {
+    if (!customAudio[key] || customAudio[key].src !== new URL(url, location.href).href) {
+      customAudio[key] = new Audio(url);
+    }
+    customAudio[key].currentTime = 0;
+    customAudio[key].play().catch(() => {});
+    return true;
+  }
+  return false;
+}
+const SFX = {
+  basic() { if (playCustom('basic')) return; tone(700, .12, 'square', .12, -400); },
+  hit()   { tone(140, .16, 'sawtooth', .18, -60); },
+  block() { tone(900, .1, 'triangle', .14); tone(1300, .12, 'triangle', .1); },
+  gacha() { if (playCustom('gacha')) return; let t = 0; for (let i = 0; i < 7; i++) setTimeout(() => tone(400 + i * 120, .07, 'square', .1), t += 90); },
+  pop()   { tone(500, .18, 'triangle', .16, 700); },
+  spec(tier) {
+    if (playCustom(tier)) return;
+    if (tier === 'legendary') { tone(90, .8, 'sawtooth', .22, 40); tone(1200, .6, 'square', .1, -900); }
+    else if (tier === 'epic') { tone(200, .5, 'sawtooth', .2, 500); }
+    else if (tier === 'rare') { tone(500, .3, 'square', .16, 400); }
+    else { tone(600, .22, 'square', .14, 300); }
+  },
+  death() { tone(300, .5, 'sawtooth', .16, -260); },
+  win()   { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, .28, 'triangle', .16), i * 170)); }
+};
+let bgmEl = null;
+function startBgm() {
+  const url = config && config.assets && config.assets.bgm;
+  if (!url) return;
+  if (!bgmEl) { bgmEl = new Audio(url); bgmEl.loop = true; bgmEl.volume = 0.35; }
+  bgmEl.play().catch(() => {});
+}
+
+/* ================= MC (Edge TTS + queue) ================= */
+const mcQueue = [];      // {text}
+let mcBusy = false;
+let ruleIdx = 0;
+let lastRuleAt = 0;
+
+function mcText(key, params) {
+  const d = I18N[lang].mc;
+  let p = { ...params };
+  if (p.item) p.item = I18N[lang].items[p.item] || p.item;
+  if (key === 'rules') return fmt(d.rules[params.i], ruleParams());
+  return fmt(d[key] || '', p);
+}
+function ruleParams() {
+  return {
+    spawn: config ? config.likesToSpawn : 50,
+    gacha: config ? config.likesPerGacha : 50,
+    inactive: config ? config.inactivitySeconds : 60
+  };
+}
+function mcSay(key, params, priority) {
+  const text = mcText(key, params);
+  if (!text) return;
+  if (priority) mcQueue.unshift({ text });
+  else mcQueue.push({ text });
+  if (mcQueue.length > 6) mcQueue.length = 6;
+  pumpMC();
+}
+async function pumpMC() {
+  if (mcBusy || !mcQueue.length) return;
+  mcBusy = true;
+  const { text } = mcQueue.shift();
+  const msgEl = document.getElementById('mcMsg');
+  const face = document.getElementById('mcFace');
+  msgEl.textContent = text;
+  face.classList.add('talking');
+  try {
+    const r = await fetch('/api/tts?lang=' + lang + '&text=' + encodeURIComponent(text));
+    if (!r.ok) throw new Error('tts ' + r.status);
+    const blob = await r.blob();
+    await new Promise((resolve) => {
+      const a = new Audio(URL.createObjectURL(blob));
+      a.onended = resolve; a.onerror = resolve;
+      a.play().catch(resolve);
+    });
+  } catch {
+    // fallback: Web Speech API
+    await new Promise((resolve) => {
+      try {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = lang === 'th' ? 'th-TH' : lang === 'ja' ? 'ja-JP' : 'en-US';
+        u.onend = resolve; u.onerror = resolve;
+        speechSynthesis.speak(u);
+        setTimeout(resolve, 8000);
+      } catch { resolve(); }
+    });
+  }
+  face.classList.remove('talking');
+  mcBusy = false;
+  setTimeout(pumpMC, 350);
+}
+// วนประกาศกติกาเมื่อคิวว่าง
+setInterval(() => {
+  if (!started) return;
+  const t = Date.now();
+  if (!mcBusy && !mcQueue.length && t - lastRuleAt > 12000) {
+    lastRuleAt = t;
+    mcSay('rules', { i: ruleIdx % I18N[lang].mc.rules.length });
+    ruleIdx++;
+  }
+}, 2500);
+
+/* ================= PIXI world ================= */
+const DW = 1000, DH = 1600;
+const app = new PIXI.Application({ resizeTo: window, background: 0x0b0620, antialias: true });
+document.getElementById('stage').appendChild(app.view);
+const world = new PIXI.Container();
+app.stage.addChild(world);
+function layout() {
+  const s = Math.max(app.screen.width / DW, app.screen.height / DH); // cover
+  world.scale.set(s);
+  world.x = (app.screen.width - DW * s) / 2;
+  world.y = (app.screen.height - DH * s) / 2;
+}
+window.addEventListener('resize', () => setTimeout(layout, 50));
+
+/* ----- background ----- */
+const bgLayer = new PIXI.Container(); world.addChild(bgLayer);
+let bgSprite = null;
+function drawDefaultBg() {
+  const g = new PIXI.Graphics();
+  // ท้องฟ้ากลางคืนไล่สี
+  const steps = 24;
+  for (let i = 0; i < steps; i++) {
+    const c = lerpColor(0x0b0620, 0x2a1560, i / steps);
+    g.beginFill(c).drawRect(0, (DH / steps) * i, DW, DH / steps + 1).endFill();
+  }
+  // ดาว
+  for (let i = 0; i < 70; i++) {
+    g.beginFill(0xffffff, Math.random() * .7 + .2)
+      .drawCircle(Math.random() * DW, Math.random() * DH * .5, Math.random() * 2.2 + .6).endFill();
+  }
+  // พระจันทร์
+  g.beginFill(0xffe9b0, .95).drawCircle(830, 200, 62).endFill();
+  g.beginFill(0x2a1560, 1).drawCircle(805, 185, 52).endFill();
+  // พื้นสนาม
+  g.beginFill(0x1d1244).drawRect(0, 820, DW, DH - 820).endFill();
+  g.beginFill(0x271a58).drawEllipse(DW / 2, 830, 560, 60).endFill();
+  // เส้นกริดสนามนีออนจาง ๆ
+  g.lineStyle(2, 0x31e6ff, .12);
+  for (let y = 900; y < DH; y += 90) { g.moveTo(0, y).lineTo(DW, y); }
+  for (let x = 0; x <= DW; x += 125) { g.moveTo(x, 860).lineTo((x - DW / 2) * 1.5 + DW / 2, DH); }
+  bgLayer.addChild(g);
+}
+function lerpColor(a, b, t) {
+  const ar = a >> 16 & 255, ag = a >> 8 & 255, ab = a & 255;
+  const br = b >> 16 & 255, bg = b >> 8 & 255, bb = b & 255;
+  return ((ar + (br - ar) * t) << 16) | ((ag + (bg - ag) * t) << 8) | (ab + (bb - ab) * t);
+}
+drawDefaultBg();
+function applyCustomBg() {
+  if (config && config.assets && config.assets.background) {
+    if (bgSprite) bgSprite.destroy();
+    bgSprite = PIXI.Sprite.from(config.assets.background);
+    bgSprite.width = DW; bgSprite.height = DH;
+    bgLayer.addChild(bgSprite);
+  } else if (bgSprite) { bgSprite.destroy(); bgSprite = null; }
+}
+
+const charLayer = new PIXI.Container(); world.addChild(charLayer);
+const fxLayer = new PIXI.Container(); world.addChild(fxLayer);
+charLayer.sortableChildren = true;
+
+/* ----- procedural characters (20 variants) ----- */
+function palette(i) {
+  const hue = (i * 137.508) % 360;
+  return {
+    body: hsl(hue, 78, 58), body2: hsl(hue, 78, 40),
+    head: hsl((hue + 30) % 360, 70, 72),
+    acc: hsl((hue + 180) % 360, 85, 60),
+    accessory: i % 5, shape: i % 3
+  };
+}
+function hsl(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return (Math.round(f(0) * 255) << 16) | (Math.round(f(8) * 255) << 8) | Math.round(f(4) * 255);
+}
+function buildCharacter(spriteIndex, customUrl) {
+  const c = new PIXI.Container();
+  const body = new PIXI.Container();
+  c.addChild(body);
+  c.bodyC = body;
+
+  const shadow = new PIXI.Graphics().beginFill(0x000000, .35).drawEllipse(0, 0, 42, 12).endFill();
+  shadow.y = 4;
+  c.addChildAt(shadow, 0);
+
+  if (customUrl) {
+    const sp = PIXI.Sprite.from(customUrl);
+    sp.anchor.set(.5, 1);
+    sp.texture.baseTexture.on('loaded', () => {
+      const sc = 140 / sp.texture.height;
+      sp.scale.set(sc);
+    });
+    if (sp.texture.baseTexture.valid) sp.scale.set(140 / sp.texture.height);
+    body.addChild(sp);
+  } else {
+    const p = palette(spriteIndex);
+    const g = new PIXI.Graphics();
+    // ขา 2 ข้าง
+    const legL = new PIXI.Graphics().beginFill(p.body2).drawRoundedRect(-6, 0, 12, 26, 6).endFill();
+    const legR = new PIXI.Graphics().beginFill(p.body2).drawRoundedRect(-6, 0, 12, 26, 6).endFill();
+    legL.x = -14; legR.x = 14; legL.y = legR.y = -26;
+    body.addChild(legL, legR);
+    c.legL = legL; c.legR = legR;
+    // ตัว
+    if (p.shape === 0) g.beginFill(p.body).drawRoundedRect(-32, -92, 64, 70, 22).endFill();
+    else if (p.shape === 1) g.beginFill(p.body).drawCircle(0, -58, 36).endFill();
+    else g.beginFill(p.body).moveTo(0, -96).lineTo(34, -24).lineTo(-34, -24).closePath().endFill();
+    // ท้อง
+    g.beginFill(0xffffff, .25).drawEllipse(0, -46, 20, 16).endFill();
+    // หัว
+    g.beginFill(p.head).drawCircle(0, -108, 26).endFill();
+    // ตา
+    g.beginFill(0x1a1030).drawCircle(-9, -112, 4.5).drawCircle(9, -112, 4.5).endFill();
+    g.beginFill(0xffffff).drawCircle(-7.5, -113.5, 1.6).drawCircle(10.5, -113.5, 1.6).endFill();
+    // ปาก
+    g.lineStyle(2.5, 0x1a1030).moveTo(-6, -100).quadraticCurveTo(0, -95, 6, -100).lineStyle(0);
+    // accessory
+    if (p.accessory === 1) { g.beginFill(p.acc).drawRoundedRect(-22, -140, 44, 12, 6).drawRoundedRect(-12, -152, 24, 16, 6).endFill(); }
+    else if (p.accessory === 2) { g.beginFill(p.acc).moveTo(-20,-128).lineTo(-30,-152).lineTo(-12,-132).closePath()
+      .moveTo(20,-128).lineTo(30,-152).lineTo(12,-132).closePath().endFill(); }
+    else if (p.accessory === 3) { g.lineStyle(4, p.acc).drawEllipse(0, -145, 18, 6).lineStyle(0); }
+    else if (p.accessory === 4) { g.lineStyle(3, p.acc).moveTo(0,-132).lineTo(0,-148).lineStyle(0)
+      .beginFill(p.acc).drawCircle(0,-152,5).endFill(); }
+    body.addChild(g);
+  }
+  return c;
+}
+
+/* ----- character entity management ----- */
+const chars = new Map(); // id -> entity
+function makeBar(w, h, color) {
+  const c = new PIXI.Container();
+  const bg = new PIXI.Graphics().beginFill(0x000000, .55).drawRoundedRect(0, 0, w, h, h / 2).endFill();
+  const fg = new PIXI.Graphics().beginFill(color).drawRoundedRect(0, 0, w, h, h / 2).endFill();
+  c.addChild(bg, fg); c.fg = fg; c.w = w;
+  return c;
+}
+function addChar(d) {
+  if (chars.has(d.id)) { updateChar(d); return; }
+  const custom = config && config.assets && config.assets.sprites[d.sprite];
+  const c = buildCharacter(d.sprite, custom);
+  c.x = d.x; c.y = d.y;
+  c.tx = d.x; c.ty = d.y;
+  c.zIndex = d.y;
+  c.data = d;
+  c.animT = Math.random() * 10;
+
+  const ui = new PIXI.Container();
+  const nameT = new PIXI.Text(d.name, new PIXI.TextStyle({
+    fontFamily: 'Kanit, "M PLUS Rounded 1c", sans-serif', fontSize: 17, fontWeight: '600',
+    fill: 0xffffff, stroke: 0x0b0620, strokeThickness: 4
+  }));
+  nameT.anchor.set(.5, 1); nameT.y = -196;
+  const hpBar = makeBar(90, 9, 0xff4d6d); hpBar.x = -45; hpBar.y = -190;
+  const mpBar = makeBar(90, 6, 0x31a8ff); mpBar.x = -45; mpBar.y = -178;
+  const badge = new PIXI.Text('', { fontSize: 18 }); badge.anchor.set(.5); badge.y = -212;
+  ui.addChild(nameT, hpBar, mpBar, badge);
+  c.addChild(ui);
+  c.hpBar = hpBar; c.mpBar = mpBar; c.badge = badge;
+
+  // เกิดแบบเด้ง
+  c.scale.set(0);
+  spawnBurst(d.x, d.y - 80, 0x31e6ff);
+  charLayer.addChild(c);
+  chars.set(d.id, c);
+  updateChar(d);
+  SFX.pop();
+}
+function updateChar(d) {
+  const c = chars.get(d.id); if (!c) return;
+  c.data = { ...c.data, ...d };
+  c.tx = d.x; c.ty = d.y;
+  c.hpBar.fg.scale.x = Math.max(0, Math.min(1, d.hp / d.maxHp));
+  const mpScale = Math.max(0.02, Math.min(1, d.mp / 100));
+  c.mpBar.fg.scale.x = mpScale;
+  c.badge.text = (d.shields ? '🛡️'.repeat(Math.min(3, d.shields)) : '') + (d.reflecting ? '🪞' : '');
+}
+function removeChar(id, deathAnim) {
+  const c = chars.get(id); if (!c) return;
+  chars.delete(id);
+  if (deathAnim) {
+    SFX.death();
+    let t = 0;
+    const tick = (delta) => {
+      t += delta / 60;
+      c.rotation = Math.min(Math.PI / 2, t * 3);
+      c.alpha = Math.max(0, 1 - t * 1.1);
+      c.y += delta * 0.4;
+      if (c.alpha <= 0) { app.ticker.remove(tick); c.destroy({ children: true }); }
+    };
+    app.ticker.add(tick);
+  } else c.destroy({ children: true });
+}
+
+/* ----- FX ----- */
+function spawnBurst(x, y, color, n = 14, speed = 5) {
+  for (let i = 0; i < n; i++) {
+    const p = new PIXI.Graphics().beginFill(color).drawCircle(0, 0, 3 + Math.random() * 4).endFill();
+    p.x = x; p.y = y;
+    const a = Math.random() * Math.PI * 2, v = speed * (0.4 + Math.random());
+    p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v;
+    fxLayer.addChild(p);
+    const tick = (delta) => {
+      p.x += p.vx * delta; p.y += p.vy * delta; p.vy += 0.15 * delta;
+      p.alpha -= 0.03 * delta;
+      if (p.alpha <= 0) { app.ticker.remove(tick); p.destroy(); }
+    };
+    app.ticker.add(tick);
+  }
+}
+const TIER_COLOR = { common: 0x6ecbff, rare: 0x4d7bff, epic: 0xb44dff, legendary: 0xffd24d };
+function projectile(fromC, toC, color, size, onArrive, arc) {
+  const p = new PIXI.Graphics().beginFill(color).drawCircle(0, 0, size).endFill();
+  const glow = new PIXI.Graphics().beginFill(color, .3).drawCircle(0, 0, size * 2).endFill();
+  p.addChildAt(glow, 0);
+  const x0 = fromC.x, y0 = fromC.y - 90, x1 = toC.x, y1 = toC.y - 90;
+  p.x = x0; p.y = y0;
+  fxLayer.addChild(p);
+  let t = 0;
+  const dur = 0.5;
+  const tick = (delta) => {
+    t += delta / 60 / dur;
+    if (t >= 1) {
+      app.ticker.remove(tick); p.destroy();
+      spawnBurst(x1, y1, color, 16, 6);
+      if (onArrive) onArrive();
+      return;
+    }
+    p.x = x0 + (x1 - x0) * t;
+    p.y = y0 + (y1 - y0) * t - (arc ? Math.sin(t * Math.PI) * 160 : 0);
+  };
+  app.ticker.add(tick);
+}
+function damageNumber(c, dmg) {
+  const t = new PIXI.Text('-' + dmg, new PIXI.TextStyle({
+    fontFamily: 'Kanit', fontSize: 30, fontWeight: '800', fill: 0xffe14d, stroke: 0x000000, strokeThickness: 5
+  }));
+  t.anchor.set(.5); t.x = c.x + (Math.random() * 40 - 20); t.y = c.y - 170;
+  fxLayer.addChild(t);
+  const tick = (delta) => {
+    t.y -= 1.4 * delta; t.alpha -= 0.02 * delta;
+    if (t.alpha <= 0) { app.ticker.remove(tick); t.destroy(); }
+  };
+  app.ticker.add(tick);
+}
+function lunge(c) {
+  if (!c) return;
+  const dir = c.data.facing || 1;
+  let t = 0;
+  const tick = (delta) => {
+    t += delta / 60;
+    c.bodyC.x = Math.sin(Math.min(1, t / .3) * Math.PI) * 22 * dir;
+    if (t >= .3) { c.bodyC.x = 0; app.ticker.remove(tick); }
+  };
+  app.ticker.add(tick);
+}
+function flashTint(c, color) {
+  if (!c) return;
+  c.bodyC.children.forEach(ch => ch.tint = color);
+  setTimeout(() => c.bodyC.children.forEach(ch => ch.tint = 0xffffff), 220);
+}
+function screenShake() {
+  document.body.classList.remove('shakeScreen');
+  void document.body.offsetWidth;
+  document.body.classList.add('shakeScreen');
+}
+function screenFlash() {
+  const f = document.getElementById('flash');
+  f.style.transition = 'none'; f.style.opacity = .85;
+  requestAnimationFrame(() => { f.style.transition = 'opacity .5s'; f.style.opacity = 0; });
+}
+
+/* ----- main render loop: interpolation + idle/walk anims ----- */
+app.ticker.add((delta) => {
+  for (const c of chars.values()) {
+    const k = 0.16 * delta;
+    const dx = c.tx - c.x, dy = c.ty - c.y;
+    c.x += dx * k; c.y += dy * k;
+    c.zIndex = c.y;
+    const moving = Math.hypot(dx, dy) > 3;
+    c.animT += delta / 60;
+    const dir = c.data.facing || 1;
+    c.bodyC.scale.x = dir;
+    if (moving) {
+      c.bodyC.y = -Math.abs(Math.sin(c.animT * 9)) * 8;
+      if (c.legL) { c.legL.rotation = Math.sin(c.animT * 11) * .6; c.legR.rotation = -Math.sin(c.animT * 11) * .6; }
+    } else {
+      c.bodyC.y = Math.sin(c.animT * 2.4) * 3;
+      if (c.legL) { c.legL.rotation = 0; c.legR.rotation = 0; }
+    }
+  }
+});
+
+/* ================= gacha overlay ================= */
+const gachaShowQueue = [];
+let gachaShowing = false;
+function showGacha(ev) {
+  gachaShowQueue.push(ev);
+  pumpGacha();
+}
+function pumpGacha() {
+  if (gachaShowing || !gachaShowQueue.length) return;
+  gachaShowing = true;
+  const ev = gachaShowQueue.shift();
+  const ov = document.getElementById('gachaOverlay');
+  const cap = document.getElementById('capsule');
+  document.getElementById('gachaItem').textContent = ITEM_ICONS[ev.item] || '🎁';
+  document.getElementById('gachaWho').textContent = ev.name;
+  document.getElementById('gachaName').textContent = '';
+  const tierEl = document.getElementById('gachaTier');
+  tierEl.textContent = I18N[lang].tier[ev.tier];
+  tierEl.className = 'tier-' + ev.tier;
+  cap.className = '';
+  ov.classList.add('show');
+  SFX.gacha();
+  setTimeout(() => cap.classList.add('shake'), 750);
+  setTimeout(() => {
+    cap.classList.remove('shake');
+    cap.classList.add('open');
+    SFX.pop();
+    document.getElementById('gachaName').textContent = I18N[lang].items[ev.item] || ev.item;
+  }, 1650);
+  setTimeout(() => {
+    ov.classList.remove('show');
+    gachaShowing = false;
+    pumpGacha();
+  }, 3400);
+}
+
+/* ================= feed ================= */
+function addFeed(ev) {
+  const el = document.createElement('div');
+  el.className = 'feedItem' + (ev.kind === 'gift' ? ' gift' : '');
+  el.textContent = (ev.kind === 'gift' ? '🎁 ' : '❤️ ') + ev.name + ' +' + ev.count + (ev.kind === 'gift' ? ' 💎' : '');
+  const feed = document.getElementById('feed');
+  feed.appendChild(el);
+  while (feed.children.length > 8) feed.removeChild(feed.firstChild);
+  setTimeout(() => el.classList.add('fade'), 5000);
+  setTimeout(() => el.remove(), 6000);
+}
+
+/* ================= socket ================= */
+const socket = io();
+let started = false;
+
+socket.on('connect', () => socket.emit('joinArena'));
+socket.on('init', (d) => {
+  config = d.config;
+  applyLang();
+  applyCustomBg();
+  d.players.forEach(addChar);
+  refreshHint();
+});
+socket.on('configChanged', (c) => { config = c; applyLang(); applyCustomBg(); });
+socket.on('state', (list) => {
+  list.forEach(updateCharSafe);
+  refreshHint(list.length);
+});
+function updateCharSafe(d) { if (chars.has(d.id)) updateChar(d); else addChar(d); }
+socket.on('spawn', (d) => { addChar(d); document.getElementById('winner').classList.remove('show'); });
+socket.on('attack', (ev) => {
+  const from = chars.get(ev.from);
+  lunge(from);
+  if (ev.type === 'basic') {
+    SFX.basic();
+    const to = chars.get(ev.to);
+    if (from && to) projectile(from, to, 0xffb84d, 8);
+  } else if (ev.type === 'aoe') {
+    SFX.spec('legendary');
+    screenFlash(); screenShake();
+    if (from) for (const [id, to] of chars) if (id !== ev.from) projectile(from, to, TIER_COLOR.legendary, 12, null, true);
+  } else {
+    SFX.spec(ev.tier);
+    const to = chars.get(ev.to);
+    if (ev.tier === 'epic' || ev.tier === 'legendary') { screenShake(); if (ev.tier === 'legendary') screenFlash(); }
+    if (from && to) projectile(from, to, TIER_COLOR[ev.tier] || 0xffffff, ev.tier === 'legendary' ? 16 : 11, null, true);
+  }
+});
+socket.on('hit', (ev) => {
+  const c = chars.get(ev.id);
+  if (c) { flashTint(c, 0xff5c5c); damageNumber(c, ev.dmg); SFX.hit(); }
+});
+socket.on('blocked', (ev) => {
+  const c = chars.get(ev.id);
+  if (c) { flashTint(c, 0x9fd8ff); SFX.block(); spawnBurst(c.x, c.y - 100, 0x9fd8ff, 10, 3); }
+});
+socket.on('reflected', (ev) => {
+  const c = chars.get(ev.from);
+  if (c) spawnBurst(c.x, c.y - 100, 0xffffff, 12, 4);
+});
+socket.on('gacha', (ev) => showGacha(ev));
+socket.on('death', (ev) => removeChar(ev.id, true));
+socket.on('remove', (ev) => removeChar(ev.id, false));
+socket.on('winner', (ev) => {
+  document.getElementById('winName').textContent = ev.name;
+  document.getElementById('winner').classList.add('show');
+  SFX.win();
+  confettiBurst();
+});
+socket.on('reset', () => {
+  for (const id of [...chars.keys()]) removeChar(id, false);
+  document.getElementById('winner').classList.remove('show');
+  refreshHint(0);
+});
+socket.on('likeFeed', addFeed);
+socket.on('mc', (ev) => { if (started) mcSay(ev.key, ev.params, ev.priority); });
+
+function refreshHint(n) {
+  const count = n !== undefined ? n : chars.size;
+  document.getElementById('hint').classList.toggle('off', count > 0);
+}
+function confettiBurst() {
+  for (let i = 0; i < 5; i++) setTimeout(() =>
+    spawnBurst(200 + Math.random() * 600, 400 + Math.random() * 400,
+      [0xff3d8b, 0x31e6ff, 0xffd24d][i % 3], 20, 7), i * 220);
+}
+
+/* ================= start / wake lock ================= */
+let wakeLock = null;
+async function acquireWakeLock() {
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch { /* unsupported */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && started) acquireWakeLock();
+});
+document.getElementById('startBtn').onclick = () => {
+  started = true;
+  unlockAudio();
+  acquireWakeLock();
+  startBgm();
+  document.getElementById('startOverlay').style.display = 'none';
+  layout();
+  lastRuleAt = 0;
+};
+
+applyLang();
+layout();
+</script>
+</body>
+</html>

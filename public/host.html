@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>Host — Battle Arena</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{--night:#0b0620;--card:#170e38;--neon-pink:#ff3d8b;--neon-cyan:#31e6ff;--gold:#ffd24d;--ink:#f4efff;--mut:#8f7fc0}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--night);color:var(--ink);font-family:'Kanit',sans-serif;min-height:100vh;
+    padding:calc(env(safe-area-inset-top) + 14px) 14px calc(env(safe-area-inset-bottom) + 30px)}
+  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  h1{font-size:19px;font-weight:800;background:linear-gradient(90deg,var(--neon-pink),var(--neon-cyan));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  #langSwitch{display:flex;gap:4px}
+  #langSwitch button{font-family:inherit;font-weight:600;font-size:12px;color:#cbb8ff;background:rgba(255,255,255,.07);
+    border:1px solid rgba(203,184,255,.25);border-radius:999px;padding:4px 10px;cursor:pointer}
+  #langSwitch button.on{color:var(--night);background:var(--neon-cyan);border-color:var(--neon-cyan)}
+  .card{background:var(--card);border:1px solid rgba(203,184,255,.15);border-radius:16px;padding:16px;margin-bottom:14px}
+  .card h2{font-size:14px;font-weight:600;color:var(--neon-cyan);margin-bottom:10px;letter-spacing:.5px}
+  label{font-size:12.5px;color:var(--mut);display:block;margin-bottom:4px}
+  input{width:100%;font-family:inherit;font-size:15px;color:var(--ink);background:#0d0726;
+    border:1px solid rgba(203,184,255,.25);border-radius:10px;padding:10px 12px;outline:none}
+  input:focus{border-color:var(--neon-cyan)}
+  .row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  button.btn{font-family:inherit;font-size:14px;font-weight:600;border:none;border-radius:10px;
+    padding:10px 16px;cursor:pointer;color:var(--night);background:var(--neon-cyan)}
+  button.btn.pink{background:var(--neon-pink);color:#fff}
+  button.btn.ghost{background:transparent;color:var(--mut);border:1px solid rgba(203,184,255,.3)}
+  button.btn.gold{background:var(--gold)}
+  button.btn:disabled{opacity:.4;cursor:default}
+  #status{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-top:10px}
+  #dot{width:10px;height:10px;border-radius:50%;background:#666;flex:none}
+  #dot.on{background:#3dff8b;box-shadow:0 0 10px #3dff8b}
+  #dot.err{background:#ff5c5c}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--mut);font-weight:600;font-size:11.5px;padding:4px 6px;border-bottom:1px solid rgba(203,184,255,.15)}
+  td{padding:7px 6px;border-bottom:1px solid rgba(203,184,255,.08)}
+  td .kick{color:#ff5c5c;background:none;border:1px solid #ff5c5c55;border-radius:8px;
+    font-family:inherit;font-size:11.5px;padding:2px 8px;cursor:pointer}
+  .dead{opacity:.45;text-decoration:line-through}
+  .hpbar{height:6px;border-radius:3px;background:#0d0726;overflow:hidden;min-width:60px}
+  .hpbar i{display:block;height:100%;background:#ff4d6d}
+  .note{font-size:11.5px;color:var(--mut);margin-top:8px;line-height:1.5}
+  a{color:var(--neon-cyan)}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>🎛️ <span data-i18n="title"></span></h1>
+  <div id="langSwitch">
+    <button data-lang="th">ไทย</button><button data-lang="en">EN</button><button data-lang="ja">日本</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2 data-i18n="connTitle"></h2>
+  <label data-i18n="userLabel"></label>
+  <input id="ttUser" placeholder="@username" autocapitalize="none" autocomplete="off">
+  <div class="row">
+    <button class="btn" id="connectBtn" data-i18n="connect"></button>
+    <button class="btn ghost" id="disconnectBtn" data-i18n="disconnect"></button>
+  </div>
+  <div id="status"><span id="dot"></span><span id="statusText">-</span></div>
+  <div class="note" data-i18n="connNote"></div>
+</div>
+
+<div class="card">
+  <h2 data-i18n="gameTitle"></h2>
+  <div class="row" style="margin-top:0">
+    <button class="btn gold" id="startBtn" data-i18n="start"></button>
+    <button class="btn ghost" id="endBtn" data-i18n="end"></button>
+    <button class="btn pink" id="newRoundBtn" data-i18n="newRound"></button>
+  </div>
+  <div id="gameState" class="note"></div>
+</div>
+
+<div class="card">
+  <h2 data-i18n="playersTitle"></h2>
+  <table>
+    <thead><tr><th data-i18n="thName"></th><th>HP</th><th>MP</th><th>❤️</th><th></th></tr></thead>
+    <tbody id="playerRows"></tbody>
+  </table>
+  <div class="note" id="noPlayers" data-i18n="noPlayers"></div>
+</div>
+
+<div class="card">
+  <h2 data-i18n="simTitle"></h2>
+  <label data-i18n="simUser"></label>
+  <input id="simUser" value="tester1" autocapitalize="none">
+  <div class="row">
+    <button class="btn ghost" onclick="sim(10)">+10 ❤️</button>
+    <button class="btn ghost" onclick="sim(50)">+50 ❤️</button>
+    <button class="btn ghost" onclick="simGift(50)">🎁 50💎</button>
+    <button class="btn ghost" onclick="simGift(500)">🎁 500💎</button>
+    <button class="btn ghost" onclick="simGift(1500)">🎁 1500💎</button>
+  </div>
+  <div class="note" data-i18n="simNote"></div>
+</div>
+
+<div class="note" style="text-align:center">
+  <a href="/arena" data-i18n="openArena"></a> · <a href="/settings" data-i18n="openSettings"></a>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const I18N = {
+  th: { title:'ห้องควบคุม', connTitle:'เชื่อมต่อ TIKTOK LIVE', userLabel:'TikTok username ของบัญชีที่กำลังไลฟ์อยู่',
+    connect:'เชื่อมต่อ', disconnect:'ตัดการเชื่อมต่อ',
+    connNote:'ต้องเปิดไลฟ์บน TikTok ก่อน แล้วค่อยกดเชื่อมต่อ · ถ้าเพิ่งเปิดเว็บหลังพักนาน Render อาจใช้เวลาตื่น ~50 วินาที',
+    gameTitle:'ควบคุมเกม', start:'เริ่มเกม', end:'หยุดเกม', newRound:'เริ่มรอบใหม่ (ล้างทุกคน)',
+    playersTitle:'ผู้เล่น', thName:'ชื่อ', noPlayers:'ยังไม่มีผู้เล่น — รอคนกดไลค์ครบตามกำหนด',
+    simTitle:'โหมดทดสอบ (ไม่ต้องไลฟ์จริง)', simUser:'ชื่อผู้ทดสอบ',
+    simNote:'จำลองไลค์/ของขวัญเพื่อทดสอบเกมบนหน้า arena ได้ทันที',
+    openArena:'เปิดหน้า Arena', openSettings:'ตั้งค่า',
+    stActive:'▶️ เกมกำลังเล่น', stPaused:'⏸️ เกมหยุดอยู่ — กด "เริ่มเกม"', stOver:'🏆 จบรอบแล้ว — กด "เริ่มรอบใหม่"',
+    kick:'เตะ',
+    st:{ idle:'ยังไม่เชื่อมต่อ', connecting:'กำลังเชื่อมต่อ...', connected:'เชื่อมต่อแล้ว ✅', disconnected:'หลุด! กำลังต่อใหม่...', streamEnd:'ไลฟ์จบแล้ว' } },
+  en: { title:'Host Console', connTitle:'CONNECT TIKTOK LIVE', userLabel:'TikTok username currently live',
+    connect:'Connect', disconnect:'Disconnect',
+    connNote:'Start your TikTok live first, then connect · After long idle, Render free may take ~50s to wake',
+    gameTitle:'Game control', start:'Start game', end:'Pause game', newRound:'New round (clear all)',
+    playersTitle:'Players', thName:'Name', noPlayers:'No players yet — waiting for likes',
+    simTitle:'Test mode (no live needed)', simUser:'Tester name',
+    simNote:'Simulate likes/gifts to test the arena instantly',
+    openArena:'Open Arena', openSettings:'Settings',
+    stActive:'▶️ Game running', stPaused:'⏸️ Paused — press "Start game"', stOver:'🏆 Round over — press "New round"',
+    kick:'Kick',
+    st:{ idle:'Not connected', connecting:'Connecting...', connected:'Connected ✅', disconnected:'Dropped! Reconnecting...', streamEnd:'Stream ended' } },
+  ja: { title:'ホスト管理', connTitle:'TIKTOK LIVE 接続', userLabel:'配信中のTikTokユーザー名',
+    connect:'接続', disconnect:'切断',
+    connNote:'先にTikTokライブを開始してから接続してください · 長時間放置後は起動に約50秒かかる場合があります',
+    gameTitle:'ゲーム操作', start:'ゲーム開始', end:'一時停止', newRound:'新ラウンド（全消去）',
+    playersTitle:'プレイヤー', thName:'名前', noPlayers:'まだプレイヤーがいません',
+    simTitle:'テストモード（ライブ不要）', simUser:'テスター名',
+    simNote:'いいね／ギフトをシミュレートしてすぐテストできます',
+    openArena:'アリーナを開く', openSettings:'設定',
+    stActive:'▶️ ゲーム中', stPaused:'⏸️ 停止中 —「ゲーム開始」を押してください', stOver:'🏆 ラウンド終了 —「新ラウンド」を押してください',
+    kick:'キック',
+    st:{ idle:'未接続', connecting:'接続中...', connected:'接続済み ✅', disconnected:'切断！再接続中...', streamEnd:'配信終了' } }
+};
+let lang = localStorage.getItem('arenaLang') || 'th';
+function applyLang(){
+  document.querySelectorAll('#langSwitch button').forEach(b=>b.classList.toggle('on',b.dataset.lang===lang));
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = I18N[lang][el.dataset.i18n] || ''; });
+  renderState(); renderStatus();
+}
+document.querySelectorAll('#langSwitch button').forEach(b=>b.onclick=()=>{
+  lang=b.dataset.lang; localStorage.setItem('arenaLang',lang); applyLang();
+});
+
+const socket = io();
+let lastStatus = { message:'idle' };
+let lastState = null;
+
+socket.on('connect', ()=>socket.emit('joinHost'));
+socket.on('connectionStatus', (s)=>{ lastStatus=s; renderStatus(); });
+socket.on('hostState', (s)=>{ lastState=s; renderState(); });
+
+function renderStatus(){
+  const dot=document.getElementById('dot');
+  const st=I18N[lang].st;
+  dot.className = lastStatus.connected ? 'on' : (String(lastStatus.message).startsWith('failed')||lastStatus.message==='disconnected' ? 'err':'');
+  let msg = st[lastStatus.message] || lastStatus.message;
+  if (lastStatus.username) msg += ' — @' + lastStatus.username;
+  document.getElementById('statusText').textContent = msg;
+}
+function renderState(){
+  if(!lastState) return;
+  const d=I18N[lang];
+  document.getElementById('gameState').textContent =
+    lastState.roundOver ? d.stOver : (lastState.gameActive ? d.stActive : d.stPaused);
+  const rows=document.getElementById('playerRows');
+  rows.innerHTML='';
+  const spawned = lastState.players.filter(p=>p.spawned);
+  document.getElementById('noPlayers').style.display = spawned.length ? 'none':'block';
+  for(const p of spawned){
+    const tr=document.createElement('tr');
+    if(!p.alive) tr.className='dead';
+    tr.innerHTML = `<td>${esc(p.name)}</td>
+      <td><div class="hpbar"><i style="width:${Math.max(0,p.hp)}%"></i></div></td>
+      <td>${p.mp}</td><td>${p.likeTotal}</td>
+      <td><button class="kick">${d.kick}</button></td>`;
+    tr.querySelector('.kick').onclick=()=>socket.emit('hostKick', p.id);
+    rows.appendChild(tr);
+  }
+}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+document.getElementById('connectBtn').onclick=()=>{
+  const u=document.getElementById('ttUser').value.trim();
+  if(!u) return;
+  document.getElementById('statusText').textContent=I18N[lang].st.connecting;
+  socket.emit('hostConnect', u, (r)=>{
+    if(!r.ok){ document.getElementById('dot').className='err';
+      document.getElementById('statusText').textContent='❌ '+(r.error||'failed'); }
+  });
+};
+document.getElementById('disconnectBtn').onclick=()=>socket.emit('hostDisconnect');
+document.getElementById('startBtn').onclick=()=>socket.emit('hostStart');
+document.getElementById('endBtn').onclick=()=>socket.emit('hostEnd');
+document.getElementById('newRoundBtn').onclick=()=>{ if(confirm('⚠️ Reset?')) socket.emit('hostNewRound'); };
+
+function sim(n){ socket.emit('simLike',{user:document.getElementById('simUser').value.trim()||'tester1',count:n}); }
+function simGift(d){ socket.emit('simGift',{user:document.getElementById('simUser').value.trim()||'tester1',diamonds:d}); }
+
+applyLang();
+</script>
+</body>
+</html>

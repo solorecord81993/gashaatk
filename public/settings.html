@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>Settings — Battle Arena</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{--night:#0b0620;--card:#170e38;--neon-pink:#ff3d8b;--neon-cyan:#31e6ff;--gold:#ffd24d;--ink:#f4efff;--mut:#8f7fc0}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--night);color:var(--ink);font-family:'Kanit',sans-serif;min-height:100vh;
+    padding:calc(env(safe-area-inset-top) + 14px) 14px calc(env(safe-area-inset-bottom) + 40px)}
+  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  h1{font-size:19px;font-weight:800;background:linear-gradient(90deg,var(--neon-pink),var(--neon-cyan));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  #langSwitch{display:flex;gap:4px}
+  #langSwitch button{font-family:inherit;font-weight:600;font-size:12px;color:#cbb8ff;background:rgba(255,255,255,.07);
+    border:1px solid rgba(203,184,255,.25);border-radius:999px;padding:4px 10px;cursor:pointer}
+  #langSwitch button.on{color:var(--night);background:var(--neon-cyan);border-color:var(--neon-cyan)}
+  .card{background:var(--card);border:1px solid rgba(203,184,255,.15);border-radius:16px;padding:16px;margin-bottom:14px}
+  .card h2{font-size:14px;font-weight:600;color:var(--neon-cyan);margin-bottom:12px;letter-spacing:.5px}
+  label{font-size:12.5px;color:var(--mut);display:block;margin:10px 0 4px}
+  input[type=number],input[type=text],input[type=password]{width:100%;font-family:inherit;font-size:15px;color:var(--ink);
+    background:#0d0726;border:1px solid rgba(203,184,255,.25);border-radius:10px;padding:10px 12px;outline:none}
+  input:focus{border-color:var(--neon-cyan)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  button.btn{font-family:inherit;font-size:14px;font-weight:600;border:none;border-radius:10px;
+    padding:11px 18px;cursor:pointer;color:var(--night);background:var(--neon-cyan)}
+  button.btn.gold{background:var(--gold)}
+  button.btn.ghost{background:transparent;color:var(--mut);border:1px solid rgba(203,184,255,.3);font-size:12px;padding:6px 10px}
+  .fileRow{display:flex;align-items:center;gap:10px;margin-top:6px}
+  .fileRow .st{font-size:11.5px;color:var(--mut);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fileRow .st.on{color:#3dff8b}
+  input[type=file]{display:none}
+  #spriteGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}
+  .slot{aspect-ratio:1;border:1px dashed rgba(203,184,255,.3);border-radius:12px;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--mut);
+    cursor:pointer;overflow:hidden;background:#0d0726;position:relative}
+  .slot img{width:100%;height:100%;object-fit:contain}
+  .slot .num{position:absolute;top:3px;left:6px;font-size:10px;color:var(--neon-cyan)}
+  .slot .clear{position:absolute;top:2px;right:2px;background:#ff5c5c;color:#fff;border:none;border-radius:6px;
+    font-size:10px;padding:1px 5px;cursor:pointer;display:none}
+  .slot.has .clear{display:block}
+  #gate{position:fixed;inset:0;background:var(--night);z-index:50;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;padding:30px}
+  #gate .lock{font-size:52px}
+  #gate input{max-width:220px;text-align:center;font-size:26px;letter-spacing:8px}
+  #gateErr{color:#ff5c5c;font-size:13px;min-height:18px}
+  .note{font-size:11.5px;color:var(--mut);margin-top:8px;line-height:1.5}
+  #saveBar{position:fixed;left:0;right:0;bottom:0;padding:10px 14px calc(env(safe-area-inset-bottom) + 10px);
+    background:linear-gradient(0deg,var(--night) 65%,transparent);display:flex;gap:10px;z-index:20}
+  #saveBar .btn{flex:1;font-size:16px;padding:13px}
+  #savedMsg{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#3dff8b;color:#0b3d1e;
+    font-weight:600;font-size:13px;padding:8px 20px;border-radius:999px;z-index:60;display:none}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="lock">🔐</div>
+  <div id="gateTitle" style="font-weight:600"></div>
+  <input id="totpCode" inputmode="numeric" maxlength="6" placeholder="••••••">
+  <button class="btn" id="totpBtn"></button>
+  <div id="gateErr"></div>
+</div>
+
+<div id="savedMsg"></div>
+
+<div class="top">
+  <h1>⚙️ <span data-i18n="title"></span></h1>
+  <div id="langSwitch">
+    <button data-lang="th">ไทย</button><button data-lang="en">EN</button><button data-lang="ja">日本</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2 data-i18n="rulesTitle"></h2>
+  <div class="grid2">
+    <div><label data-i18n="likesToSpawn"></label><input type="number" id="likesToSpawn" min="1"></div>
+    <div><label data-i18n="likesPerGacha"></label><input type="number" id="likesPerGacha" min="1"></div>
+    <div><label data-i18n="inactivitySeconds"></label><input type="number" id="inactivitySeconds" min="10"></div>
+    <div><label data-i18n="startHP"></label><input type="number" id="startHP" min="10"></div>
+    <div><label data-i18n="basicAttackCost"></label><input type="number" id="basicAttackCost" min="1"></div>
+    <div><label data-i18n="basicDmg"></label>
+      <div style="display:flex;gap:6px">
+        <input type="number" id="basicAttackMin" min="1"><input type="number" id="basicAttackMax" min="1">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2 data-i18n="giftTitle"></h2>
+  <div class="grid2">
+    <div><label>🔵 Rare ≥ 💎</label><input type="number" id="rareMin" min="1"></div>
+    <div><label>🟣 Epic ≥ 💎</label><input type="number" id="epicMin" min="1"></div>
+    <div><label>🟡 Legendary ≥ 💎</label><input type="number" id="legendaryMin" min="1"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2 data-i18n="imgTitle"></h2>
+  <label data-i18n="bgLabel"></label>
+  <div class="fileRow">
+    <button class="btn ghost" onclick="pick('background','image/*')" data-i18n="upload"></button>
+    <span class="st" id="st_background"></span>
+    <button class="btn ghost" onclick="clearAsset('background')">✕</button>
+  </div>
+  <label data-i18n="spriteLabel"></label>
+  <div id="spriteGrid"></div>
+  <div class="note" data-i18n="spriteNote"></div>
+</div>
+
+<div class="card">
+  <h2 data-i18n="soundTitle"></h2>
+  <div id="soundRows"></div>
+</div>
+
+<div id="saveBar"><button class="btn gold" id="saveBtn"></button></div>
+<div style="height:60px"></div>
+
+<input type="file" id="filePicker">
+
+<script>
+const I18N = {
+  th:{ title:'ตั้งค่าเกม', gateTitle:'กรอกรหัสจากแอป Authenticator', gateBtn:'ปลดล็อก', gateErr:'รหัสไม่ถูกต้อง',
+    rulesTitle:'กติกาเกม', likesToSpawn:'ไลค์เพื่อเกิดตัวละคร', likesPerGacha:'ไลค์ต่อกาชา 1 ครั้ง',
+    inactivitySeconds:'ไม่กดไลค์เกิน (วินาที) = ตาย', startHP:'HP เริ่มต้น', basicAttackCost:'MP ต่อโจมตีธรรมดา',
+    basicDmg:'ดาเมจธรรมดา (ต่ำสุด/สูงสุด)', giftTitle:'ช่วงเหรียญของขวัญ → ระดับกาชา',
+    imgTitle:'ภาพ', bgLabel:'ฉากหลัง (แนวตั้ง 1000×1600)', spriteLabel:'Sprite ตัวละคร 20 ช่อง (PNG พื้นใส แนะนำสูง ≥200px)',
+    spriteNote:'ช่องว่าง = ใช้ตัวละคร default ในตัวเกม · แตะช่องเพื่ออัปโหลด · ✕ เพื่อคืนค่า default',
+    soundTitle:'เสียง (mp3/m4a)', upload:'อัปโหลด', save:'💾 บันทึกทั้งหมด', saved:'บันทึกแล้ว ✅',
+    notPersistent:'⚠️ ยังไม่ได้ตั้งค่า Supabase — ไฟล์นี้จะหายเมื่อ server restart',
+    sounds:{ bgm:'เพลง Background (loop)', basic:'เสียงโจมตีธรรมดา', gacha:'เสียงหมุนกาชาปอง',
+      spec_common:'Special — Common', spec_rare:'Special — Rare', spec_epic:'Special — Epic', spec_legendary:'Special — Legendary' } },
+  en:{ title:'Game Settings', gateTitle:'Enter Authenticator code', gateBtn:'Unlock', gateErr:'Invalid code',
+    rulesTitle:'Game rules', likesToSpawn:'Likes to spawn', likesPerGacha:'Likes per gacha',
+    inactivitySeconds:'Inactive seconds = death', startHP:'Starting HP', basicAttackCost:'MP per basic attack',
+    basicDmg:'Basic damage (min/max)', giftTitle:'Gift coin ranges → gacha tier',
+    imgTitle:'Images', bgLabel:'Background (portrait 1000×1600)', spriteLabel:'Character sprites — 20 slots (transparent PNG, height ≥200px)',
+    spriteNote:'Empty slot = built-in default character · Tap a slot to upload · ✕ to reset',
+    soundTitle:'Sounds (mp3/m4a)', upload:'Upload', save:'💾 Save all', saved:'Saved ✅',
+    notPersistent:'⚠️ Supabase not configured — this file is lost on server restart',
+    sounds:{ bgm:'Background music (loop)', basic:'Basic attack SFX', gacha:'Gacha roll SFX',
+      spec_common:'Special — Common', spec_rare:'Special — Rare', spec_epic:'Special — Epic', spec_legendary:'Special — Legendary' } },
+  ja:{ title:'ゲーム設定', gateTitle:'Authenticatorコードを入力', gateBtn:'解除', gateErr:'コードが違います',
+    rulesTitle:'ゲームルール', likesToSpawn:'キャラ誕生いいね数', likesPerGacha:'ガチャ1回のいいね数',
+    inactivitySeconds:'非アクティブ秒数＝死亡', startHP:'初期HP', basicAttackCost:'通常攻撃MP',
+    basicDmg:'通常ダメージ（最小/最大）', giftTitle:'ギフトコイン → ガチャランク',
+    imgTitle:'画像', bgLabel:'背景（縦 1000×1600）', spriteLabel:'キャラスプライト 20枠（透過PNG、高さ200px以上）',
+    spriteNote:'空欄＝内蔵デフォルトキャラ · タップでアップロード · ✕でリセット',
+    soundTitle:'サウンド (mp3/m4a)', upload:'アップロード', save:'💾 すべて保存', saved:'保存しました ✅',
+    notPersistent:'⚠️ Supabase未設定 — 再起動でファイルが消えます',
+    sounds:{ bgm:'BGM（ループ）', basic:'通常攻撃SE', gacha:'ガチャSE',
+      spec_common:'必殺技 — コモン', spec_rare:'必殺技 — レア', spec_epic:'必殺技 — エピック', spec_legendary:'必殺技 — レジェンド' } }
+};
+let lang = localStorage.getItem('arenaLang') || 'th';
+let token = null;
+let cfg = null;
+
+function d(){ return I18N[lang]; }
+function applyLang(){
+  document.querySelectorAll('#langSwitch button').forEach(b=>b.classList.toggle('on',b.dataset.lang===lang));
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = d()[el.dataset.i18n] || ''; });
+  document.getElementById('gateTitle').textContent = d().gateTitle;
+  document.getElementById('totpBtn').textContent = d().gateBtn;
+  document.getElementById('saveBtn').textContent = d().save;
+  renderSounds(); renderSprites(); renderAssetStatus();
+}
+document.querySelectorAll('#langSwitch button').forEach(b=>b.onclick=()=>{
+  lang=b.dataset.lang; localStorage.setItem('arenaLang',lang); applyLang();
+});
+
+/* ---------- TOTP gate ---------- */
+document.getElementById('totpBtn').onclick = tryUnlock;
+document.getElementById('totpCode').addEventListener('input', e=>{
+  if(e.target.value.length===6) tryUnlock();
+});
+async function tryUnlock(){
+  const code = document.getElementById('totpCode').value.trim();
+  const r = await fetch('/api/totp',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code})});
+  if(r.ok){
+    token = (await r.json()).token;
+    document.getElementById('gate').style.display='none';
+    load();
+  } else {
+    document.getElementById('gateErr').textContent = d().gateErr;
+    document.getElementById('totpCode').value='';
+  }
+}
+
+/* ---------- load / render ---------- */
+const NUM_FIELDS = ['likesToSpawn','likesPerGacha','inactivitySeconds','startHP','basicAttackCost',
+  'basicAttackMin','basicAttackMax','rareMin','epicMin','legendaryMin'];
+async function load(){
+  cfg = await (await fetch('/api/config')).json();
+  NUM_FIELDS.forEach(k=>document.getElementById(k).value = cfg[k]);
+  renderSounds(); renderSprites(); renderAssetStatus();
+}
+function renderAssetStatus(){
+  if(!cfg) return;
+  const el=document.getElementById('st_background');
+  el.textContent = cfg.assets.background ? '✅' : '—';
+  el.className = 'st' + (cfg.assets.background?' on':'');
+}
+function renderSounds(){
+  if(!cfg) return;
+  const wrap=document.getElementById('soundRows');
+  wrap.innerHTML='';
+  const keys=['bgm','basic','gacha','spec_common','spec_rare','spec_epic','spec_legendary'];
+  for(const k of keys){
+    const cur = k==='bgm' ? cfg.assets.bgm : cfg.assets.sfx[k];
+    const row=document.createElement('div');
+    row.innerHTML=`<label>${d().sounds[k]}</label>
+      <div class="fileRow">
+        <button class="btn ghost">${d().upload}</button>
+        <span class="st ${cur?'on':''}">${cur?'✅':'—'}</span>
+        <button class="btn ghost">✕</button>
+      </div>`;
+    const [up,clr]=row.querySelectorAll('button');
+    up.onclick=()=>pick(k==='bgm'?'bgm':'sfx.'+k,'audio/*');
+    clr.onclick=()=>clearAsset(k==='bgm'?'bgm':'sfx.'+k);
+    wrap.appendChild(row);
+  }
+}
+function renderSprites(){
+  if(!cfg) return;
+  const grid=document.getElementById('spriteGrid');
+  grid.innerHTML='';
+  for(let i=0;i<20;i++){
+    const url=cfg.assets.sprites[i];
+    const slot=document.createElement('div');
+    slot.className='slot'+(url?' has':'');
+    slot.innerHTML=`<span class="num">${i+1}</span>${url?`<img src="${url}">`:'📦'}<button class="clear">✕</button>`;
+    slot.onclick=()=>pick('sprites.'+i,'image/*');
+    slot.querySelector('.clear').onclick=(e)=>{e.stopPropagation();clearAsset('sprites.'+i);};
+    grid.appendChild(slot);
+  }
+}
+
+/* ---------- upload ---------- */
+let pickTarget=null;
+function pick(target,accept){
+  pickTarget=target;
+  const f=document.getElementById('filePicker');
+  f.accept=accept; f.value=''; f.click();
+}
+document.getElementById('filePicker').onchange=async (e)=>{
+  const file=e.target.files[0];
+  if(!file||!pickTarget) return;
+  const dataUrl=await new Promise((res,rej)=>{
+    const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file);
+  });
+  const r=await fetch('/api/upload',{method:'POST',
+    headers:{'Content-Type':'application/json','x-auth-token':token},
+    body:JSON.stringify({dataUrl,name:file.name})});
+  if(!r.ok){ alert('Upload failed'); return; }
+  const j=await r.json();
+  setAsset(pickTarget, j.url);
+  if(!j.persistent) alert(d().notPersistent);
+  await saveAssetsOnly();
+};
+function setAsset(target,url){
+  if(target==='background') cfg.assets.background=url;
+  else if(target==='bgm') cfg.assets.bgm=url;
+  else if(target.startsWith('sfx.')) cfg.assets.sfx[target.slice(4)]=url;
+  else if(target.startsWith('sprites.')) cfg.assets.sprites[Number(target.slice(8))]=url;
+  renderSounds(); renderSprites(); renderAssetStatus();
+}
+function clearAsset(target){ setAsset(target,null); saveAssetsOnly(); }
+
+/* ---------- save ---------- */
+async function saveAssetsOnly(){ await saveToServer({assets:cfg.assets}); }
+document.getElementById('saveBtn').onclick=async ()=>{
+  const patch={assets:cfg.assets};
+  NUM_FIELDS.forEach(k=>patch[k]=Number(document.getElementById(k).value));
+  await saveToServer(patch);
+};
+async function saveToServer(patch){
+  const r=await fetch('/api/settings',{method:'POST',
+    headers:{'Content-Type':'application/json','x-auth-token':token},
+    body:JSON.stringify(patch)});
+  if(r.ok){
+    cfg=(await r.json()).settings;
+    const m=document.getElementById('savedMsg');
+    m.textContent=d().saved; m.style.display='block';
+    setTimeout(()=>m.style.display='none',1800);
+  } else alert('Save failed — session expired? Reload page.');
+}
+
+applyLang();
+</script>
+</body>
+</html>
