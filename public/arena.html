@@ -27,8 +27,7 @@
   /* ---------- top bar ---------- */
   #topbar{position:fixed;top:0;left:0;right:0;z-index:20;
     padding:calc(env(safe-area-inset-top) + 6px) 12px 6px;
-    display:flex;justify-content:space-between;align-items:center;
-    background:linear-gradient(180deg,rgba(6,3,18,.92),rgba(6,3,18,0));pointer-events:none}
+    display:flex;justify-content:flex-end;align-items:center;pointer-events:none}
   #logo{font-weight:800;font-size:17px;letter-spacing:.5px;
     background:linear-gradient(90deg,var(--neon-pink),var(--neon-cyan));
     -webkit-background-clip:text;background-clip:text;color:transparent;
@@ -127,7 +126,6 @@
 <div id="flash"></div>
 
 <div id="topbar">
-  <div id="logo">⚡ LIKE BATTLE ARENA</div>
   <div id="langSwitch">
     <button data-lang="th">ไทย</button>
     <button data-lang="en">EN</button>

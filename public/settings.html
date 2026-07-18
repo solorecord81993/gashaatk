@@ -258,7 +258,7 @@ document.getElementById('filePicker').onchange=async (e)=>{
   if(!r.ok){ alert('Upload failed'); return; }
   const j=await r.json();
   setAsset(pickTarget, j.url);
-  if(!j.persistent) alert(d().notPersistent);
+  if(!j.persistent) alert(d().notPersistent + (j.sbError ? '\n(' + j.sbError + ')' : ''));
   await saveAssetsOnly();
 };
 function setAsset(target,url){
