@@ -76,17 +76,23 @@ app.post('/api/upload', requireAuth, async (req, res) => {
     const sb = settingsMod.getSupabase();
     if (sb) {
       await ensureBucket(sb);
-      const { error } = await sb.storage.from(BUCKET).upload(fname, buf, { contentType: mime, upsert: true });
+      let { error } = await sb.storage.from(BUCKET).upload(fname, buf, { contentType: mime, upsert: true });
+      if (error && /bucket/i.test(error.message || '')) {
+        // bucket ยังไม่มี → สร้างแล้วลองใหม่
+        try { await sb.storage.createBucket(BUCKET, { public: true }); } catch { /* ignore */ }
+        ({ error } = await sb.storage.from(BUCKET).upload(fname, buf, { contentType: mime, upsert: true }));
+      }
       if (!error) {
         const { data } = sb.storage.from(BUCKET).getPublicUrl(fname);
         return res.json({ ok: true, url: data.publicUrl, persistent: true });
       }
       console.warn('[upload] supabase upload failed:', error.message);
+      var sbError = error.message;
     }
     // fallback: memory (หายเมื่อ restart)
     const id = crypto.randomBytes(8).toString('hex');
     memFiles.set(id, { buf, mime });
-    res.json({ ok: true, url: `/uploads/${id}`, persistent: false });
+    res.json({ ok: true, url: `/uploads/${id}`, persistent: false, sbError: sbError || 'no supabase env' });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
