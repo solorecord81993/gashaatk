@@ -192,6 +192,7 @@ const I18N = {
       ko: 'คุณ{name} ถูกน็อกเอาต์ ตกรอบไปแล้ว!',
       inactiveDeath: 'คุณ{name} หายไปไหน! ไม่กดไลค์นานเกินไป ตัวละครสลายแล้ว!',
       winner: 'จบเกม! ผู้ชนะคือคุณ{name} ยอดนักสู้แห่งไลฟ์นี้!',
+      lastStanding: 'คุณ{name} ครองสนามเป็นคนสุดท้าย! ใครกล้ามาท้าชิง กดไลค์ครบเลย!',
       revive: 'ปาฏิหาริย์! คุณ{name} ฟื้นคืนชีพกลับมาสู้อีกครั้ง!',
       rules: [
         'กดไลค์ให้ครบ {spawn} ครั้ง รับตัวละครของคุณมาสู้ได้เลย!',
@@ -218,6 +219,7 @@ const I18N = {
       ko: '{name} is knocked out and eliminated!',
       inactiveDeath: 'Where did {name} go? No likes for too long — their fighter has vanished!',
       winner: 'Game over! The winner is {name}, champion of this live!',
+      lastStanding: '{name} rules the arena! Who dares to challenge? Start liking now!',
       revive: 'A miracle! {name} has been revived!',
       rules: [
         'Tap {spawn} likes to spawn your own fighter!',
@@ -244,6 +246,7 @@ const I18N = {
       ko: '{name}さん、ノックアウトで脱落！',
       inactiveDeath: '{name}さん、どこへ？いいねが止まってキャラが消滅！',
       winner: 'ゲーム終了！優勝は{name}さん、このライブのチャンピオン！',
+      lastStanding: '{name}さんがアリーナを制圧！挑戦者よ、いいねで参戦だ！',
       revive: '奇跡だ！{name}さんが復活！',
       rules: [
         'いいねを{spawn}回タップして自分のキャラをゲット！',
@@ -294,17 +297,28 @@ function tone(freq, dur, type = 'square', vol = 0.14, slide = 0) {
   o.connect(g).connect(AC.destination);
   o.start(); o.stop(AC.currentTime + dur);
 }
+/* เล่นไฟล์เสียงผ่าน WebAudio (iOS อนุญาตหลังปลดล็อก AudioContext แล้ว) */
+const bufCache = {};
+async function playUrl(url, { loop = false, vol = 1 } = {}) {
+  if (!AC) return null;
+  try {
+    if (!bufCache[url]) {
+      const ab = await (await fetch(url)).arrayBuffer();
+      bufCache[url] = await AC.decodeAudioData(ab);
+    }
+    const src = AC.createBufferSource();
+    src.buffer = bufCache[url];
+    src.loop = loop;
+    const g = AC.createGain(); g.gain.value = vol;
+    src.connect(g).connect(AC.destination);
+    src.start();
+    return src;
+  } catch { return null; }
+}
 function playCustom(key) {
   const url = config && config.assets && (key === 'gacha' ? config.assets.sfx.gacha :
     key === 'basic' ? config.assets.sfx.basic : config.assets.sfx['spec_' + key]);
-  if (url) {
-    if (!customAudio[key] || customAudio[key].src !== new URL(url, location.href).href) {
-      customAudio[key] = new Audio(url);
-    }
-    customAudio[key].currentTime = 0;
-    customAudio[key].play().catch(() => {});
-    return true;
-  }
+  if (url) { playUrl(url); return true; }
   return false;
 }
 const SFX = {
@@ -323,12 +337,11 @@ const SFX = {
   death() { tone(300, .5, 'sawtooth', .16, -260); },
   win()   { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, .28, 'triangle', .16), i * 170)); }
 };
-let bgmEl = null;
-function startBgm() {
+let bgmSrc = null;
+async function startBgm() {
   const url = config && config.assets && config.assets.bgm;
-  if (!url) return;
-  if (!bgmEl) { bgmEl = new Audio(url); bgmEl.loop = true; bgmEl.volume = 0.35; }
-  bgmEl.play().catch(() => {});
+  if (!url || bgmSrc) return;
+  bgmSrc = await playUrl(url, { loop: true, vol: 0.35 });
 }
 
 /* ================= MC (Edge TTS + queue) ================= */
@@ -370,11 +383,16 @@ async function pumpMC() {
   try {
     const r = await fetch('/api/tts?lang=' + lang + '&text=' + encodeURIComponent(text));
     if (!r.ok) throw new Error('tts ' + r.status);
-    const blob = await r.blob();
+    const ab = await r.arrayBuffer();
+    if (!AC) throw new Error('no audio ctx');
+    const buf = await AC.decodeAudioData(ab);
     await new Promise((resolve) => {
-      const a = new Audio(URL.createObjectURL(blob));
-      a.onended = resolve; a.onerror = resolve;
-      a.play().catch(resolve);
+      const src = AC.createBufferSource();
+      src.buffer = buf;
+      src.connect(AC.destination);
+      src.onended = resolve;
+      src.start();
+      setTimeout(resolve, buf.duration * 1000 + 1500); // กันค้าง
     });
   } catch {
     // fallback: Web Speech API
@@ -836,6 +854,7 @@ document.addEventListener('visibilitychange', () => {
 document.getElementById('startBtn').onclick = () => {
   started = true;
   unlockAudio();
+  try { speechSynthesis.speak(new SpeechSynthesisUtterance('')); } catch {}
   acquireWakeLock();
   startBgm();
   document.getElementById('startOverlay').style.display = 'none';
