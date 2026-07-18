@@ -681,6 +681,8 @@ function screenFlash() {
 /* ----- main render loop: interpolation + idle/walk anims ----- */
 app.ticker.add((delta) => {
   for (const c of chars.values()) {
+    // อนิเมชันเกิด: ขยายจาก 0 → 1 แบบเด้ง
+    if (c.scale.x < 1) c.scale.set(Math.min(1, c.scale.x + 0.09 * delta));
     const k = 0.16 * delta;
     const dx = c.tx - c.x, dy = c.ty - c.y;
     c.x += dx * k; c.y += dy * k;
