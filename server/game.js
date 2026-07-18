@@ -102,13 +102,15 @@ function death(p, cause, by) {
   checkWinner();
 }
 
+let lastStandingId = null;
 function checkWinner() {
-  if (!gameActive || roundOver) return;
+  if (!gameActive) return;
   const alive = aliveList();
-  if (everSpawned >= 2 && alive.length === 1) {
-    roundOver = true;
-    io.to('arena').emit('winner', { id: alive[0].id, name: alive[0].name });
-    io.to('arena').emit('mc', { key: 'winner', params: { name: alive[0].name }, priority: true });
+  if (alive.length > 1) { lastStandingId = null; return; }
+  // เหลือคนเดียว = ครองสนาม รอผู้ท้าชิงต่อ (ไม่มีหน้าจบเกม)
+  if (everSpawned >= 2 && alive.length === 1 && lastStandingId !== alive[0].id) {
+    lastStandingId = alive[0].id;
+    io.to('arena').emit('mc', { key: 'lastStanding', params: { name: alive[0].name }, priority: true });
     pushHostState();
   }
 }
@@ -241,7 +243,7 @@ function tick() {
     if (!p.alive) continue;
 
     // ตายเพราะไม่ active (เฉพาะตอนเกมกำลังเล่นและยังไม่จบรอบ)
-    if (gameActive && !roundOver && t - p.lastLikeAt > s.inactivitySeconds * 1000) {
+    if (gameActive && t - p.lastLikeAt > s.inactivitySeconds * 1000) {
       death(p, 'inactive', null);
       continue;
     }
@@ -270,7 +272,7 @@ function tick() {
     }
 
     // โจมตีธรรมดาอัตโนมัติ
-    if (gameActive && !roundOver && t >= p.nextAttackAt) {
+    if (gameActive && t >= p.nextAttackAt) {
       p.nextAttackAt = t + randInt(3000, 8000);
       if (p.mp >= s.basicAttackCost) {
         const targets = alive.filter(o => o.id !== p.id);
