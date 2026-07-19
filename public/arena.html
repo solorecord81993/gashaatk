@@ -379,10 +379,14 @@ async function pumpMC() {
   msgEl.textContent = text;
   face.classList.add('talking');
   try {
-    const r = await fetch('/api/tts?lang=' + lang + '&text=' + encodeURIComponent(text));
+    if (!AC) throw new Error('no audio ctx');
+    if (AC.state === 'suspended') { try { await AC.resume(); } catch {} }
+    const ctrl = new AbortController();
+    const kill = setTimeout(() => ctrl.abort(), 7000); // TTS ช้าเกิน 7 วิ = ข้ามไป fallback
+    const r = await fetch('/api/tts?lang=' + lang + '&text=' + encodeURIComponent(text), { signal: ctrl.signal });
+    clearTimeout(kill);
     if (!r.ok) throw new Error('tts ' + r.status);
     const ab = await r.arrayBuffer();
-    if (!AC) throw new Error('no audio ctx');
     const buf = await AC.decodeAudioData(ab);
     await new Promise((resolve) => {
       const src = AC.createBufferSource();
@@ -847,7 +851,10 @@ async function acquireWakeLock() {
   try { wakeLock = await navigator.wakeLock.request('screen'); } catch { /* unsupported */ }
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && started) acquireWakeLock();
+  if (document.visibilityState === 'visible' && started) {
+    acquireWakeLock();
+    if (AC && AC.state === 'suspended') AC.resume().catch(() => {});
+  }
 });
 document.getElementById('startBtn').onclick = () => {
   started = true;
