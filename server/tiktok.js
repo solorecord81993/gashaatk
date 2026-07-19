@@ -16,7 +16,11 @@ function setStatus(patch) {
 
 // ---- ดึง field แบบกันเหนียว (รองรับได้ทั้งโครงสร้าง v1 และ v2) ----
 function getUniqueId(d) {
-  return (d.user && (d.user.uniqueId || d.user.uniqueID)) || d.uniqueId || (d.user && d.user.idStr) || null;
+  const u = d.user || {};
+  return u.uniqueId || u.uniqueID || u.displayId || u.display_id || u.username || d.uniqueId || u.idStr || (u.id != null ? String(u.id) : null) || null;
+}
+function getLikeCount(d) {
+  return Number(d.likeCount ?? d.count ?? 1); // v1 ใช้ likeCount, v2 (proto ดิบ) ใช้ count
 }
 function getNickname(d) {
   return (d.user && d.user.nickname) || d.nickname || getUniqueId(d);
@@ -29,7 +33,7 @@ function getDiamonds(d) {
   return Number(v || 0);
 }
 function getGiftType(d) {
-  return d.giftType ?? (d.giftDetails && d.giftDetails.giftType) ?? (d.gift && (d.gift.giftType || d.gift.gift_type)) ?? 0;
+  return d.giftType ?? (d.giftDetails && d.giftDetails.giftType) ?? (d.gift && (d.gift.giftType || d.gift.gift_type || d.gift.type)) ?? 0;
 }
 
 async function connect(username) {
@@ -54,8 +58,9 @@ async function tryConnect() {
           io.to('host').emit('ttEvent', { kind: 'noid', info: 'like' });
           return;
         }
-        io.to('host').emit('ttEvent', { kind: 'like', id, name: getNickname(d), count: Number(d.likeCount || 1) });
-        game.onLike(String(id), getNickname(d), Number(d.likeCount || 1));
+        const n = getLikeCount(d);
+        io.to('host').emit('ttEvent', { kind: 'like', id, name: getNickname(d), count: n });
+        game.onLike(String(id), getNickname(d), n);
       } catch (e) { console.error('[tiktok] like handler:', e.message); }
     });
 
