@@ -80,10 +80,18 @@
     <div><label data-i18n="likesPerGacha"></label><input type="number" id="likesPerGacha" min="1"></div>
     <div><label data-i18n="inactivitySeconds"></label><input type="number" id="inactivitySeconds" min="10"></div>
     <div><label data-i18n="startHP"></label><input type="number" id="startHP" min="10"></div>
-    <div><label data-i18n="basicAttackCost"></label><input type="number" id="basicAttackCost" min="1"></div>
-    <div><label data-i18n="basicDmg"></label>
+  </div>
+</div>
+
+<div class="card">
+  <h2 data-i18n="bossTitle"></h2>
+  <div class="grid2">
+    <div><label data-i18n="bossBaseHP"></label><input type="number" id="bossBaseHP" min="50"></div>
+    <div><label data-i18n="bossHpMult"></label><input type="number" id="bossHpMult" min="1" step="0.1"></div>
+    <div><label data-i18n="bossBaseDmg"></label><input type="number" id="bossBaseDmg" min="1"></div>
+    <div><label data-i18n="bossCooldown"></label>
       <div style="display:flex;gap:6px">
-        <input type="number" id="basicAttackMin" min="1"><input type="number" id="basicAttackMax" min="1">
+        <input type="number" id="bossCooldownMin" min="3"><input type="number" id="bossCooldownMax" min="4">
       </div>
     </div>
   </div>
@@ -123,7 +131,7 @@
 
 <script>
 const I18N = {
-  th:{ title:'ตั้งค่าเกม', gateTitle:'กรอกรหัสจากแอป Authenticator', gateBtn:'ปลดล็อก', gateErr:'รหัสไม่ถูกต้อง',
+  th:{ title:'ตั้งค่าเกม', bossTitle:'บอส', bossBaseHP:'HP บอสด่านแรก', bossHpMult:'ตัวคูณ HP ต่อด่าน (เช่น 1.5)', bossBaseDmg:'ดาเมจบอสด่านแรก', bossCooldown:'คูลดาวน์ท่าบอส (ต่ำสุด/สูงสุด วินาที)', gateTitle:'กรอกรหัสจากแอป Authenticator', gateBtn:'ปลดล็อก', gateErr:'รหัสไม่ถูกต้อง',
     rulesTitle:'กติกาเกม', likesToSpawn:'ไลค์เพื่อเกิดตัวละคร', likesPerGacha:'ไลค์ต่อกาชา 1 ครั้ง',
     inactivitySeconds:'ไม่กดไลค์เกิน (วินาที) = ตาย', startHP:'HP เริ่มต้น', basicAttackCost:'MP ต่อโจมตีธรรมดา',
     basicDmg:'ดาเมจธรรมดา (ต่ำสุด/สูงสุด)', giftTitle:'ช่วงเหรียญของขวัญ → ระดับกาชา',
@@ -133,7 +141,7 @@ const I18N = {
     notPersistent:'⚠️ ยังไม่ได้ตั้งค่า Supabase — ไฟล์นี้จะหายเมื่อ server restart',
     sounds:{ bgm:'เพลง Background (loop)', basic:'เสียงโจมตีธรรมดา', gacha:'เสียงหมุนกาชาปอง',
       spec_common:'Special — Common', spec_rare:'Special — Rare', spec_epic:'Special — Epic', spec_legendary:'Special — Legendary' } },
-  en:{ title:'Game Settings', gateTitle:'Enter Authenticator code', gateBtn:'Unlock', gateErr:'Invalid code',
+  en:{ title:'Game Settings', bossTitle:'Boss', bossBaseHP:'Stage-1 boss HP', bossHpMult:'HP multiplier per stage (e.g. 1.5)', bossBaseDmg:'Stage-1 boss damage', bossCooldown:'Boss attack cooldown (min/max sec)', gateTitle:'Enter Authenticator code', gateBtn:'Unlock', gateErr:'Invalid code',
     rulesTitle:'Game rules', likesToSpawn:'Likes to spawn', likesPerGacha:'Likes per gacha',
     inactivitySeconds:'Inactive seconds = death', startHP:'Starting HP', basicAttackCost:'MP per basic attack',
     basicDmg:'Basic damage (min/max)', giftTitle:'Gift coin ranges → gacha tier',
@@ -143,7 +151,7 @@ const I18N = {
     notPersistent:'⚠️ Supabase not configured — this file is lost on server restart',
     sounds:{ bgm:'Background music (loop)', basic:'Basic attack SFX', gacha:'Gacha roll SFX',
       spec_common:'Special — Common', spec_rare:'Special — Rare', spec_epic:'Special — Epic', spec_legendary:'Special — Legendary' } },
-  ja:{ title:'ゲーム設定', gateTitle:'Authenticatorコードを入力', gateBtn:'解除', gateErr:'コードが違います',
+  ja:{ title:'ゲーム設定', bossTitle:'ボス', bossBaseHP:'ステージ1のボスHP', bossHpMult:'ステージ毎HP倍率（例 1.5）', bossBaseDmg:'ステージ1のボス攻撃力', bossCooldown:'ボス攻撃クールダウン（最小/最大 秒）', gateTitle:'Authenticatorコードを入力', gateBtn:'解除', gateErr:'コードが違います',
     rulesTitle:'ゲームルール', likesToSpawn:'キャラ誕生いいね数', likesPerGacha:'ガチャ1回のいいね数',
     inactivitySeconds:'非アクティブ秒数＝死亡', startHP:'初期HP', basicAttackCost:'通常攻撃MP',
     basicDmg:'通常ダメージ（最小/最大）', giftTitle:'ギフトコイン → ガチャランク',
@@ -191,8 +199,9 @@ async function tryUnlock(){
 }
 
 /* ---------- load / render ---------- */
-const NUM_FIELDS = ['likesToSpawn','likesPerGacha','inactivitySeconds','startHP','basicAttackCost',
-  'basicAttackMin','basicAttackMax','rareMin','epicMin','legendaryMin'];
+const NUM_FIELDS = ['likesToSpawn','likesPerGacha','inactivitySeconds','startHP',
+  'rareMin','epicMin','legendaryMin',
+  'bossBaseHP','bossHpMult','bossBaseDmg','bossCooldownMin','bossCooldownMax'];
 async function load(){
   cfg = await (await fetch('/api/config')).json();
   NUM_FIELDS.forEach(k=>document.getElementById(k).value = cfg[k]);

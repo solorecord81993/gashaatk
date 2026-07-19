@@ -38,8 +38,20 @@
     border-radius:999px;padding:4px 10px;cursor:pointer}
   #langSwitch button.on{color:#0b0620;background:var(--neon-cyan);border-color:var(--neon-cyan)}
 
+  /* ---------- boss bar ---------- */
+  #bossBar{position:fixed;left:12px;right:12px;z-index:18;pointer-events:none;
+    top:calc(env(safe-area-inset-top) + 46px);text-align:center}
+  #bossName{font-size:15px;font-weight:800;color:#ffb3c8;text-shadow:0 0 12px rgba(255,61,139,.7);margin-bottom:3px}
+  .bbar{height:12px;border-radius:6px;background:rgba(0,0,0,.6);overflow:hidden;
+    border:1px solid rgba(255,61,139,.5);margin:0 auto 3px;max-width:520px}
+  .bbar i{display:block;height:100%;background:linear-gradient(90deg,#ff2d55,#ff6b8d);
+    transition:width .25s;border-radius:6px}
+  .bbar.mp{height:6px;max-width:400px;border-color:rgba(180,77,255,.5)}
+  .bbar.mp i{background:linear-gradient(90deg,#8a2be2,#c56bff)}
+  #bossStun{font-size:12px;color:#7cf5ff;height:16px;font-weight:600}
+
   /* ---------- like/gift feed ---------- */
-  #feed{position:fixed;right:8px;top:22%;z-index:15;display:flex;flex-direction:column;
+  #feed{position:fixed;right:8px;top:26%;z-index:15;display:flex;flex-direction:column;
     gap:5px;align-items:flex-end;pointer-events:none;max-width:52vw}
   .feedItem{font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;
     background:rgba(10,5,30,.72);border:1px solid rgba(49,230,255,.35);
@@ -126,6 +138,13 @@
   </div>
 </div>
 
+<div id="bossBar">
+  <div id="bossName">-</div>
+  <div class="bbar"><i id="bossHpFill" style="width:100%"></i></div>
+  <div class="bbar mp"><i id="bossMpFill" style="width:50%"></i></div>
+  <div id="bossStun"></div>
+</div>
+
 <div id="feed"></div>
 
 <div id="mcBar">
@@ -165,87 +184,90 @@ const I18N = {
   th: {
     startBtn: 'เริ่มถ่ายทอด!', startNote: 'แตะปุ่มเพื่อเปิดเสียง MC และกันหน้าจอดับ\nจากนั้นเปิดไลฟ์ TikTok แบบแชร์หน้าจอได้เลย',
     hintTitle: '💗 กดไลค์ครบ {n} ครั้ง รับตัวละคร!', hintSub: 'ส่งของขวัญ = สุ่มกาชาปองระดับพิเศษทันที',
-    winnerTitle: 'ผู้ชนะ', mcName: 'MC',
+    winnerTitle: 'ปราบบอสสำเร็จ!', mcName: 'MC',
     tier: { common: 'COMMON', rare: 'RARE', epic: 'EPIC', legendary: 'LEGENDARY' },
-    items: { shield1:'โล่ป้องกัน 1 ครั้ง', shield3:'โล่ป้องกัน 3 ครั้ง', healSmall:'ยาฟื้นฟูเล็ก +10',
-      healBig:'ยาฟื้นฟูใหญ่ +30', specLight:'สเปเชียลเบา', specMid:'สเปเชียลกลาง', specHeavy:'สเปเชียลหนัก',
-      reflect:'กระจกสะท้อนดาเมจ 10 วิ', aoe:'อุกกาบาตถล่มทุกคน', revive:'ชุบชีวิต', ultimate:'อัลติเมทเบรกเกอร์' },
+    items: { shield1:'โล่กันบอส 1 ครั้ง', shield3:'โล่กันบอส 3 ครั้ง', healSmall:'ยาฟื้นฟูเล็ก +10',
+      healBig:'ยาฟื้นฟูใหญ่ +30', specLight:'สเปเชียลถล่มบอส (เบา)', specMid:'สเปเชียลถล่มบอส (กลาง)', specHeavy:'สเปเชียลถล่มบอส (หนัก)',
+      reflect:'กระจกสะท้อนดาเมจ 10 วิ', meteor:'อุกกาบาต + สตันบอส', revive:'ชุบชีวิต', ultimate:'อัลติเมทเบรกเกอร์' },
     mc: {
-      welcome: 'ยินดีต้อนรับนักสู้คนใหม่ คุณ{name} เข้าสู่สนามประลอง!',
+      welcome: 'ยินดีต้อนรับนักล่าคนใหม่ คุณ{name} เข้าร่วมล่าบอส!',
       gachaItem: 'คุณ{name} หมุนกาชาปอง ได้ {item}!',
-      special: 'โอ้โห! คุณ{name} ปล่อยท่าไม้ตายใส่คุณ{target}!',
-      aoe: 'ระวัง! คุณ{name} ปล่อยพลังถล่มทั้งสนาม!',
-      ko: 'คุณ{name} ถูกน็อกเอาต์ ตกรอบไปแล้ว!',
+      special: 'โอ้โห! คุณ{name} ปล่อยท่าไม้ตายใส่ {boss}!',
+      meteor: 'อุกกาบาตยักษ์! คุณ{name} ถล่ม {boss} จนมึนไปเลย!',
+      koByBoss: 'คุณ{name} โดน {boss} จัดการร่วงแล้ว! กดไลค์ให้ครบเพื่อคืนชีพ!',
       inactiveDeath: 'คุณ{name} หายไปไหน! ไม่กดไลค์นานเกินไป ตัวละครสลายแล้ว!',
-      winner: 'จบเกม! ผู้ชนะคือคุณ{name} ยอดนักสู้แห่งไลฟ์นี้!',
-      lastStanding: 'คุณ{name} ครองสนามเป็นคนสุดท้าย! ใครกล้ามาท้าชิง กดไลค์ครบเลย!',
+      levelUp: 'คุณ{name} อัปเลเวลเป็นเลเวล {level} แล้ว! แรงขึ้น เร็วขึ้น!',
+      bossSpawn: 'บอสปรากฏตัว! {name} เลเวล {level}! ทุกคนรุมกดไลค์โจมตีเลย!',
+      bossDefeated: 'สุดยอดดด! พวกเราล้ม {name} เลเวล {level} ได้แล้ว! ระวัง บอสตัวต่อไปกำลังมา!',
       revive: 'ปาฏิหาริย์! คุณ{name} ฟื้นคืนชีพกลับมาสู้อีกครั้ง!',
       rules: [
-        'กดไลค์ให้ครบ {spawn} ครั้ง รับตัวละครของคุณมาสู้ได้เลย!',
+        'กดไลค์ครบ {spawn} ครั้ง รับตัวละครมาร่วมล่าบอส!',
+        'ไลค์ 1 ครั้ง = โจมตีบอส 1 ที ยิ่งเลเวลสูงยิ่งแรงยิ่งแม่น!',
         'ไลค์ทุก {gacha} ครั้ง สุ่มกาชาปองรับไอเทมฟรี!',
-        'ส่งของขวัญ ยิ่งแพงยิ่งได้ไอเทมระดับตำนาน!',
-        'อย่าหยุดกดไลค์นะ หยุดเกิน {inactive} วินาที ตัวละครตายทันที!',
-        'ไลค์คือพลัง MP ไว้โจมตี ใครรอดคนสุดท้ายชนะ!'
+        'ส่งของขวัญ ลุ้นท่าไม้ตายระดับตำนานถล่มบอส!',
+        'ระวังวงแดง! บอสจะฟาดตรงนั้น! และอย่าหยุดไลค์เกิน {inactive} วิ ไม่งั้นตัวละครตาย!'
       ]
     }
   },
   en: {
     startBtn: 'START BROADCAST!', startNote: 'Tap to enable MC voice and keep the screen awake,\nthen start your TikTok screen-share live.',
     hintTitle: '💗 Hit {n} likes to spawn your fighter!', hintSub: 'Send a gift for an instant premium gacha roll',
-    winnerTitle: 'WINNER', mcName: 'MC',
+    winnerTitle: 'BOSS DEFEATED!', mcName: 'MC',
     tier: { common: 'COMMON', rare: 'RARE', epic: 'EPIC', legendary: 'LEGENDARY' },
     items: { shield1:'Shield x1', shield3:'Shield x3', healSmall:'Small Heal +10', healBig:'Big Heal +30',
-      specLight:'Light Special', specMid:'Mid Special', specHeavy:'Heavy Special',
-      reflect:'Damage Mirror 10s', aoe:'Meteor Storm', revive:'Revive', ultimate:'Ultimate Breaker' },
+      specLight:'Light Special (boss)', specMid:'Mid Special (boss)', specHeavy:'Heavy Special (boss)',
+      reflect:'Damage Mirror 10s', meteor:'Meteor + Stun Boss', revive:'Revive', ultimate:'Ultimate Breaker' },
     mc: {
-      welcome: 'Welcome a new fighter — {name} enters the arena!',
+      welcome: 'Welcome a new hunter — {name} joins the boss raid!',
       gachaItem: '{name} rolls the gacha and gets {item}!',
-      special: 'Whoa! {name} unleashes a special attack on {target}!',
-      aoe: 'Watch out! {name} nukes the whole arena!',
-      ko: '{name} is knocked out and eliminated!',
-      inactiveDeath: 'Where did {name} go? No likes for too long — their fighter has vanished!',
-      winner: 'Game over! The winner is {name}, champion of this live!',
-      lastStanding: '{name} rules the arena! Who dares to challenge? Start liking now!',
+      special: 'Whoa! {name} unleashes a special attack on {boss}!',
+      meteor: 'Giant meteor! {name} smashes {boss} — it is stunned!',
+      koByBoss: '{name} was taken down by {boss}! Like up to respawn!',
+      inactiveDeath: 'Where did {name} go? No likes for too long — their hero has vanished!',
+      levelUp: '{name} leveled up to level {level}! Stronger and faster!',
+      bossSpawn: 'A boss appears! {name}, level {level}! Everyone, attack with likes!',
+      bossDefeated: 'Amazing! We defeated {name}, level {level}! The next boss is coming!',
       revive: 'A miracle! {name} has been revived!',
       rules: [
-        'Tap {spawn} likes to spawn your own fighter!',
+        'Tap {spawn} likes to spawn your hero and join the raid!',
+        '1 like = 1 attack on the boss. Higher level = more damage and accuracy!',
         'Every {gacha} likes rolls a free gacha item!',
-        'Send gifts — the pricier the gift, the more legendary the item!',
-        'Keep liking! Stop for {inactive} seconds and your fighter dies!',
-        'Likes are MP for attacks. Last one standing wins!'
+        'Send gifts for legendary special attacks on the boss!',
+        'Dodge the red circles! And never stop liking for {inactive}s or your hero dies!'
       ]
     }
   },
   ja: {
     startBtn: '配信スタート！', startNote: 'タップでMCボイスを有効化し、画面スリープを防ぎます。\nその後、TikTokの画面共有ライブを開始してください。',
     hintTitle: '💗 いいね{n}回でキャラ誕生！', hintSub: 'ギフトを送ると即プレミアムガチャ！',
-    winnerTitle: '優勝', mcName: 'MC',
+    winnerTitle: 'ボス討伐！', mcName: 'MC',
     tier: { common: 'コモン', rare: 'レア', epic: 'エピック', legendary: 'レジェンド' },
     items: { shield1:'シールド x1', shield3:'シールド x3', healSmall:'小回復 +10', healBig:'大回復 +30',
-      specLight:'ライト必殺技', specMid:'ミドル必殺技', specHeavy:'ヘビー必殺技',
-      reflect:'ダメージ反射 10秒', aoe:'メテオストーム', revive:'リバイブ', ultimate:'アルティメット' },
+      specLight:'ライト必殺技（ボス）', specMid:'ミドル必殺技（ボス）', specHeavy:'ヘビー必殺技（ボス）',
+      reflect:'ダメージ反射 10秒', meteor:'メテオ＋ボススタン', revive:'リバイブ', ultimate:'アルティメット' },
     mc: {
-      welcome: '新しいファイター、{name}さんがアリーナに参戦！',
+      welcome: '新しいハンター、{name}さんがボスレイドに参戦！',
       gachaItem: '{name}さんがガチャを回して{item}をゲット！',
-      special: 'すごい！{name}さんが{target}さんに必殺技！',
-      aoe: '危ない！{name}さんが全体攻撃を放った！',
-      ko: '{name}さん、ノックアウトで脱落！',
+      special: 'すごい！{name}さんがボス{boss}に必殺技！',
+      meteor: '巨大メテオ！{name}さんが{boss}を粉砕、スタン状態だ！',
+      koByBoss: '{name}さん、{boss}にやられた！いいねで復活しよう！',
       inactiveDeath: '{name}さん、どこへ？いいねが止まってキャラが消滅！',
-      winner: 'ゲーム終了！優勝は{name}さん、このライブのチャンピオン！',
-      lastStanding: '{name}さんがアリーナを制圧！挑戦者よ、いいねで参戦だ！',
+      levelUp: '{name}さんがレベル{level}にアップ！強く速くなった！',
+      bossSpawn: 'ボス出現！{name}、レベル{level}！みんな、いいねで攻撃だ！',
+      bossDefeated: 'やった！{name} レベル{level}を撃破！次のボスが来るぞ！',
       revive: '奇跡だ！{name}さんが復活！',
       rules: [
-        'いいねを{spawn}回タップして自分のキャラをゲット！',
+        'いいねを{spawn}回タップしてキャラをゲット、レイドに参加！',
+        'いいね1回＝ボスへ攻撃1回。レベルが高いほど強く正確！',
         'いいね{gacha}回ごとに無料ガチャ！',
-        'ギフトを送ろう！高いほどレジェンド級アイテム！',
-        'いいねを止めないで！{inactive}秒止まるとキャラ死亡！',
-        'いいねは攻撃のMP。最後の1人が勝者！'
+        'ギフトを送ってレジェンド級の必殺技をボスに！',
+        '赤い円に注意！{inactive}秒いいねが止まるとキャラ死亡！'
       ]
     }
   }
 };
 const ITEM_ICONS = { shield1:'🛡️', shield3:'🛡️', healSmall:'💚', healBig:'💖', specLight:'🔥', specMid:'⚡',
-  specHeavy:'☄️', reflect:'🪞', aoe:'🌋', revive:'✨', ultimate:'💥' };
+  specHeavy:'☄️', reflect:'🪞', meteor:'🌋', revive:'✨', ultimate:'💥' };
 
 let lang = localStorage.getItem('arenaLang') || 'th';
 let config = null;
@@ -321,6 +343,7 @@ const SFX = {
     else { tone(600, .22, 'square', .14, 300); }
   },
   death() { tone(300, .5, 'sawtooth', .16, -260); },
+  warn()  { tone(880, .12, 'square', .12); setTimeout(() => tone(880, .12, 'square', .12), 200); },
   win()   { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, .28, 'triangle', .16), i * 170)); }
 };
 let bgmSrc = null;
@@ -542,6 +565,93 @@ function buildCharacter(spriteIndex, customUrl) {
   return c;
 }
 
+/* ----- BOSS ----- */
+const bossLayer = new PIXI.Container();
+world.addChildAt(bossLayer, world.getChildIndex(charLayer)); // อยู่หลังฮีโร่
+let bossC = null, bossData = null;
+
+function buildBossVisual(level) {
+  const c = new PIXI.Container();
+  const hue = (level * 77) % 360;
+  const col = hsl(hue, 72, 42), col2 = hsl(hue, 72, 28), eye = hsl((hue + 180) % 360, 95, 62);
+  const g = new PIXI.Graphics();
+  g.beginFill(0x000000, .4).drawEllipse(0, 12, 155, 34).endFill();          // เงา
+  g.beginFill(col).drawEllipse(0, -125, 145, 155).endFill();                 // ตัว
+  g.beginFill(col2).drawEllipse(0, -70, 112, 82).endFill();                  // ท้อง
+  g.beginFill(col2);                                                          // เขา
+  g.moveTo(-92, -225).lineTo(-135, -305).lineTo(-52, -248).closePath();
+  g.moveTo(92, -225).lineTo(135, -305).lineTo(52, -248).closePath();
+  g.endFill();
+  g.beginFill(eye).drawEllipse(-46, -172, 24, 15).drawEllipse(46, -172, 24, 15).endFill(); // ตาเรืองแสง
+  g.beginFill(0x120616).drawCircle(-46, -172, 8).drawCircle(46, -172, 8).endFill();
+  g.beginFill(0x1a0a20).drawEllipse(0, -112, 58, 27).endFill();              // ปาก
+  g.beginFill(0xffffff);                                                      // เขี้ยว
+  for (let i = -2; i <= 2; i++) { g.moveTo(i * 21 - 8, -132).lineTo(i * 21, -106).lineTo(i * 21 + 8, -132).closePath(); }
+  g.endFill();
+  c.addChild(g);
+  c.gfx = g;
+  return c;
+}
+
+function buildBoss(b) {
+  if (!b) return;
+  bossData = b;
+  if (bossC) { bossC.destroy({ children: true }); bossC = null; }
+  bossC = buildBossVisual(b.level);
+  bossC.x = b.x; bossC.y = b.y;
+  bossC.baseScale = Math.min(1.45, 1 + b.level * 0.03);
+  bossC.animT = 0;
+  bossC.scale.set(0);
+  bossLayer.addChild(bossC);
+  spawnBurst(b.x, b.y - 120, 0xff3d8b, 24, 7);
+  updateBossBar();
+}
+
+function updateBossBar() {
+  if (!bossData) return;
+  document.getElementById('bossName').textContent = '👹 ' + bossData.name + '  Lv.' + bossData.level;
+  document.getElementById('bossHpFill').style.width = Math.max(0, bossData.hp / bossData.maxHp * 100) + '%';
+  document.getElementById('bossMpFill').style.width = Math.max(0, bossData.mp / bossData.maxMp * 100) + '%';
+  document.getElementById('bossStun').textContent = bossData.stunned ? '💫 STUN!' : '';
+}
+
+function bossHurt(dmg) {
+  if (!bossC) return;
+  if (bossC.gfx) { bossC.gfx.tint = 0xff6666; setTimeout(() => { if (bossC && bossC.gfx) bossC.gfx.tint = 0xffffff; }, 180); }
+  if (dmg > 0) floatText(bossC.x + rand2(-60, 60), bossC.y - 220, '-' + dmg, 0xffe14d, 30);
+  else floatText(bossC.x + rand2(-60, 60), bossC.y - 220, 'MISS', 0xaaaaaa, 24);
+}
+
+function bossDeathAnim() {
+  if (!bossC) return;
+  const c = bossC; bossC = null;
+  let t = 0;
+  const tick = (delta) => {
+    t += delta / 60;
+    c.rotation = t * 0.8;
+    c.alpha = Math.max(0, 1 - t * 0.8);
+    c.y += delta * 1.2;
+    if (c.alpha <= 0) { app.ticker.remove(tick); c.destroy({ children: true }); }
+  };
+  app.ticker.add(tick);
+  screenFlash(); screenShake();
+}
+
+function rand2(a, b) { return a + Math.random() * (b - a); }
+
+function floatText(x, y, str, color, size) {
+  const t = new PIXI.Text(str, new PIXI.TextStyle({
+    fontFamily: 'Kanit', fontSize: size || 28, fontWeight: '800', fill: color, stroke: 0x000000, strokeThickness: 5
+  }));
+  t.anchor.set(.5); t.x = x; t.y = y;
+  fxLayer.addChild(t);
+  const tick = (delta) => {
+    t.y -= 1.4 * delta; t.alpha -= 0.02 * delta;
+    if (t.alpha <= 0) { app.ticker.remove(tick); t.destroy(); }
+  };
+  app.ticker.add(tick);
+}
+
 /* ----- character entity management ----- */
 const chars = new Map(); // id -> entity
 function makeBar(w, h, color) {
@@ -562,17 +672,17 @@ function addChar(d) {
   c.animT = Math.random() * 10;
 
   const ui = new PIXI.Container();
-  const nameT = new PIXI.Text(d.name, new PIXI.TextStyle({
+  const nameT = new PIXI.Text('Lv.' + (d.level || 1) + ' ' + d.name, new PIXI.TextStyle({
     fontFamily: 'Kanit, "M PLUS Rounded 1c", sans-serif', fontSize: 17, fontWeight: '600',
     fill: 0xffffff, stroke: 0x0b0620, strokeThickness: 4
   }));
   nameT.anchor.set(.5, 1); nameT.y = -196;
   const hpBar = makeBar(90, 9, 0xff4d6d); hpBar.x = -45; hpBar.y = -190;
-  const mpBar = makeBar(90, 6, 0x31a8ff); mpBar.x = -45; mpBar.y = -178;
+  const mpBar = makeBar(90, 6, 0xffd24d); mpBar.x = -45; mpBar.y = -178; // EXP bar (ทอง)
   const badge = new PIXI.Text('', { fontSize: 18 }); badge.anchor.set(.5); badge.y = -212;
   ui.addChild(nameT, hpBar, mpBar, badge);
   c.addChild(ui);
-  c.hpBar = hpBar; c.mpBar = mpBar; c.badge = badge;
+  c.hpBar = hpBar; c.mpBar = mpBar; c.badge = badge; c.nameT = nameT;
 
   // เกิดแบบเด้ง
   c.scale.set(0);
@@ -587,8 +697,8 @@ function updateChar(d) {
   c.data = { ...c.data, ...d };
   c.tx = d.x; c.ty = d.y;
   c.hpBar.fg.scale.x = Math.max(0, Math.min(1, d.hp / d.maxHp));
-  const mpScale = Math.max(0.02, Math.min(1, d.mp / 100));
-  c.mpBar.fg.scale.x = mpScale;
+  if (d.expNeed) c.mpBar.fg.scale.x = Math.max(0.02, Math.min(1, d.exp / d.expNeed)); // EXP
+  if (c.nameT && d.level) c.nameT.text = 'Lv.' + d.level + ' ' + d.name;
   c.badge.text = (d.shields ? '🛡️'.repeat(Math.min(3, d.shields)) : '') + (d.reflecting ? '🪞' : '');
 }
 function removeChar(id, deathAnim) {
@@ -688,6 +798,14 @@ function screenFlash() {
 
 /* ----- main render loop: interpolation + idle/walk anims ----- */
 app.ticker.add((delta) => {
+  if (bossC) {
+    bossC.animT += delta / 60;
+    bossC.scale.set(bossC.baseScale * (1 + Math.sin(bossC.animT * 2.2) * 0.02));
+    if (bossC.gfx && bossData) {
+      if (bossData.stunned && bossC.gfx.tint === 0xffffff) bossC.gfx.tint = 0x7cd8ff;
+      else if (!bossData.stunned && bossC.gfx.tint === 0x7cd8ff) bossC.gfx.tint = 0xffffff;
+    }
+  }
   for (const c of chars.values()) {
     // อนิเมชันเกิด: ขยายจาก 0 → 1 แบบเด้ง
     if (c.scale.x < 1) c.scale.set(Math.min(1, c.scale.x + 0.09 * delta));
@@ -767,29 +885,109 @@ socket.on('init', (d) => {
   applyLang();
   applyCustomBg();
   d.players.forEach(addChar);
+  if (d.boss && d.boss.alive) buildBoss(d.boss);
 });
 socket.on('configChanged', (c) => { config = c; applyLang(); applyCustomBg(); });
-socket.on('state', (list) => {
-  list.forEach(updateCharSafe);
+socket.on('state', (snap) => {
+  (snap.players || []).forEach(updateCharSafe);
+  if (snap.boss) {
+    bossData = snap.boss;
+    updateBossBar();
+    if (snap.boss.alive && !bossC) buildBoss(snap.boss);
+  }
 });
 function updateCharSafe(d) { if (chars.has(d.id)) updateChar(d); else addChar(d); }
 socket.on('spawn', (d) => { addChar(d); document.getElementById('winner').classList.remove('show'); });
+// ท่าไม้ตายจากกาชา → ใส่บอส
 socket.on('attack', (ev) => {
   const from = chars.get(ev.from);
   lunge(from);
-  if (ev.type === 'basic') {
-    SFX.basic();
-    const to = chars.get(ev.to);
-    if (from && to) projectile(from, to, 0xffb84d, 8);
-  } else if (ev.type === 'aoe') {
+  if (!bossC) return;
+  const bossTarget = { x: bossC.x, y: bossC.y + 60 };
+  if (ev.type === 'meteor') {
     SFX.spec('legendary');
-    screenFlash(); screenShake();
-    if (from) for (const [id, to] of chars) if (id !== ev.from) projectile(from, to, TIER_COLOR.legendary, 12, null, true);
+    // อุกกาบาตตกจากฟ้าใส่บอส
+    const rock = new PIXI.Graphics().beginFill(0xff7733).drawCircle(0, 0, 34).endFill();
+    rock.x = bossC.x; rock.y = -80;
+    fxLayer.addChild(rock);
+    const tick = (delta) => {
+      rock.y += 22 * delta;
+      if (rock.y >= bossC.y - 120) {
+        app.ticker.remove(tick); rock.destroy();
+        spawnBurst(bossC.x, bossC.y - 120, 0xff7733, 30, 9);
+        screenFlash(); screenShake();
+        bossHurt(ev.dmg);
+      }
+    };
+    app.ticker.add(tick);
   } else {
     SFX.spec(ev.tier);
-    const to = chars.get(ev.to);
     if (ev.tier === 'epic' || ev.tier === 'legendary') { screenShake(); if (ev.tier === 'legendary') screenFlash(); }
-    if (from && to) projectile(from, to, TIER_COLOR[ev.tier] || 0xffffff, ev.tier === 'legendary' ? 16 : 11, null, true);
+    if (from) projectile(from, bossTarget, TIER_COLOR[ev.tier] || 0xffffff, ev.tier === 'legendary' ? 16 : 11,
+      () => bossHurt(ev.dmg), true);
+  }
+});
+
+// ไลค์ = ฮีโร่โจมตีบอส
+socket.on('heroAttack', (ev) => {
+  const from = chars.get(ev.from);
+  lunge(from);
+  SFX.basic();
+  if (from && bossC) {
+    projectile(from, { x: bossC.x + rand2(-70, 70), y: bossC.y - 60 }, 0xffb84d, 8,
+      () => { if (ev.dmg > 0) bossHurt(ev.dmg); else bossHurt(0); });
+  }
+});
+
+// บอสเตือนโซนโจมตี (วงแดงกะพริบ)
+socket.on('bossTelegraph', (ev) => {
+  SFX.warn();
+  const g = new PIXI.Graphics();
+  fxLayer.addChild(g);
+  let t = 0; const dur = ev.warnMs / 1000 + 1.6; // เตือน + ช่วงฟาด
+  const tick = (delta) => {
+    t += delta / 60;
+    g.clear();
+    const a = .18 + .16 * Math.abs(Math.sin(t * 14));
+    g.lineStyle(5, 0xff3040, .95).beginFill(0xff3040, a).drawCircle(ev.x, ev.y, ev.r).endFill();
+    if (t >= dur) { app.ticker.remove(tick); g.destroy(); }
+  };
+  app.ticker.add(tick);
+});
+
+// บอสฟาดลงโซน
+socket.on('bossStrike', (ev) => {
+  spawnBurst(ev.x, ev.y, 0xff5030, 20, 7);
+  if (!ev.victims || !ev.victims.length) {
+    floatText(ev.x, ev.y - 40, 'MISS', 0xaaaaaa, 26);
+    return;
+  }
+  SFX.hit();
+  for (const v of ev.victims) {
+    const c = chars.get(v.id);
+    if (!c) continue;
+    if (v.blocked) { flashTint(c, 0x9fd8ff); SFX.block(); floatText(c.x, c.y - 170, 'BLOCK', 0x9fd8ff, 22); }
+    else if (v.reflected) { spawnBurst(c.x, c.y - 100, 0xffffff, 12, 4); floatText(c.x, c.y - 170, 'REFLECT!', 0xffffff, 22); }
+    else { flashTint(c, 0xff5c5c); floatText(c.x, c.y - 170, '-' + v.dmg, 0xff6b6b, 26); }
+  }
+});
+
+socket.on('bossSpawn', (b) => buildBoss(b));
+
+socket.on('bossDefeated', (ev) => {
+  bossDeathAnim();
+  SFX.win();
+  confettiBurst();
+  document.getElementById('winName').textContent = '👹 ' + ev.name + '  Lv.' + ev.level;
+  document.getElementById('winner').classList.add('show');
+  setTimeout(() => document.getElementById('winner').classList.remove('show'), 5000); // ค้าง 5 วิ
+});
+
+socket.on('levelUp', (ev) => {
+  const c = chars.get(ev.id);
+  if (c) {
+    spawnBurst(c.x, c.y - 100, 0xffd24d, 18, 5);
+    floatText(c.x, c.y - 200, 'LEVEL UP! Lv.' + ev.level, 0xffd24d, 24);
   }
 });
 socket.on('hit', (ev) => {
@@ -807,12 +1005,6 @@ socket.on('reflected', (ev) => {
 socket.on('gacha', (ev) => showGacha(ev));
 socket.on('death', (ev) => removeChar(ev.id, true));
 socket.on('remove', (ev) => removeChar(ev.id, false));
-socket.on('winner', (ev) => {
-  document.getElementById('winName').textContent = ev.name;
-  document.getElementById('winner').classList.add('show');
-  SFX.win();
-  confettiBurst();
-});
 socket.on('reset', () => {
   for (const id of [...chars.keys()]) removeChar(id, false);
   document.getElementById('winner').classList.remove('show');

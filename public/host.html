@@ -79,7 +79,7 @@
 <div class="card">
   <h2 data-i18n="playersTitle"></h2>
   <table>
-    <thead><tr><th data-i18n="thName"></th><th>HP</th><th>MP</th><th>❤️</th><th></th></tr></thead>
+    <thead><tr><th data-i18n="thName"></th><th>HP</th><th>Lv</th><th>❤️</th><th></th></tr></thead>
     <tbody id="playerRows"></tbody>
   </table>
   <div class="note" id="noPlayers" data-i18n="noPlayers"></div>
@@ -187,8 +187,12 @@ function renderStatus(){
 function renderState(){
   if(!lastState) return;
   const d=I18N[lang];
-  document.getElementById('gameState').textContent =
-    lastState.roundOver ? d.stOver : (lastState.gameActive ? d.stActive : d.stPaused);
+  let gs = lastState.gameActive ? d.stActive : d.stPaused;
+  if (lastState.boss) {
+    gs += `  ·  👹 ${lastState.boss.name} Lv.${lastState.boss.level} — HP ${lastState.boss.hp}/${lastState.boss.maxHp}` +
+      (lastState.boss.alive ? '' : ' 💀');
+  }
+  document.getElementById('gameState').textContent = gs;
   const rows=document.getElementById('playerRows');
   rows.innerHTML='';
   const spawned = lastState.players.filter(p=>p.spawned);
@@ -198,7 +202,7 @@ function renderState(){
     if(!p.alive) tr.className='dead';
     tr.innerHTML = `<td>${esc(p.name)}</td>
       <td><div class="hpbar"><i style="width:${Math.max(0,p.hp)}%"></i></div></td>
-      <td>${p.mp}</td><td>${p.likeTotal}</td>
+      <td>${p.level||1}</td><td>${p.likeTotal}</td>
       <td><button class="kick">${d.kick}</button></td>`;
     tr.querySelector('.kick').onclick=()=>socket.emit('hostKick', p.id);
     rows.appendChild(tr);
