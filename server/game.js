@@ -1,37 +1,101 @@
-// server/game.js — core game state & loop (authoritative on server)
+// server/game.js — Boss Raid mode: ทุกคนรุมบอสกลางจอ (authoritative on server)
 const settingsMod = require('./settings');
 const { ITEM_DEFS } = require('./settings');
 
-const W = 1000, H = 1600;                 // โลกเกม (แนวตั้ง 9:16)
-const FIELD = { x1: 70, x2: 930, y1: 860, y2: 1470 }; // พื้นที่เดิน
+const W = 1000, H = 1600;
+const FIELD = { x1: 70, x2: 930, y1: 950, y2: 1470 }; // พื้นที่เดินของฮีโร่ (ใต้บอส)
+const BOSS_POS = { x: 500, y: 780 };                   // บอสยืนกลางค่อนบน
 const TICK_MS = 100;
 
 let io = null;
-let players = new Map();   // uniqueId -> player
-let nextIdx = 0;           // ลำดับการเกิด (ใช้เลือก sprite วน 20)
-let gameActive = true; // เกมเปิดตลอด รอผู้ท้าชิง — host กด "หยุดเกม" เพื่อพักได้
-let roundOver = false;
-let everSpawned = 0;
+let players = new Map();
+let nextIdx = 0;
+let gameActive = true; // เกมเปิดตลอด
+let boss = null;
+let stage = 1;
 let loopTimer = null;
 
 function now() { return Date.now(); }
 function rand(min, max) { return min + Math.random() * (max - min); }
 function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
 
+// ---------- เลเวล/ค่าพลังฮีโร่ ----------
+function expNeed(level) { return 100 + (level - 1) * 80; }        // exp ที่ต้องใช้ไปเลเวลถัดไป
+function perLikeDmg(level) { return 1 + Math.floor(level / 2); }  // ดาเมจต่อ 1 ไลค์
+function hitChance(level) { return Math.min(0.95, 0.55 + level * 0.04); } // โอกาสโจมตีโดน
+function walkSpeed(level) { return Math.min(2.2, 1 + level * 0.04); }     // ตัวคูณความเร็วเดิน/หลบ
+
+// ---------- บอส ----------
+const BOSS_PREFIX = ['อสูร', 'ราชัน', 'จอมมาร', 'ปีศาจ', 'มังกร', 'ยักษ์', 'เจ้าแม่', 'ภูตพราย', 'อสรพิษ', 'เทพสงคราม'];
+const BOSS_SUFFIX = ['เพลิงนรก', 'เงามืด', 'สายฟ้า', 'น้ำแข็งดำ', 'พายุคลั่ง', 'โลหิต', 'หมื่นปี', 'ดวงดาวดับ', 'เหวลึก', 'ทมิฬ'];
+
+function spawnBoss() {
+  const s = settingsMod.get();
+  const maxHp = Math.round(s.bossBaseHP * Math.pow(s.bossHpMult, stage - 1));
+  boss = {
+    name: BOSS_PREFIX[randInt(0, BOSS_PREFIX.length - 1)] + BOSS_SUFFIX[randInt(0, BOSS_SUFFIX.length - 1)],
+    level: stage,
+    hp: maxHp, maxHp,
+    mp: 50, maxMp: 100,
+    dmg: Math.round(s.bossBaseDmg * (1 + 0.25 * (stage - 1))),
+    cooldown: [s.bossCooldownMin, s.bossCooldownMax],
+    nextAttackAt: now() + 5000,
+    stunnedUntil: 0,
+    alive: true,
+    x: BOSS_POS.x, y: BOSS_POS.y
+  };
+  io.to('arena').emit('bossSpawn', pubBoss());
+  io.to('arena').emit('mc', { key: 'bossSpawn', params: { name: boss.name, level: boss.level }, priority: true });
+  pushHostState();
+}
+
+function pubBoss() {
+  return boss && {
+    name: boss.name, level: boss.level, hp: Math.max(0, boss.hp), maxHp: boss.maxHp,
+    mp: Math.round(boss.mp), maxMp: boss.maxMp, alive: boss.alive,
+    x: boss.x, y: boss.y, stunned: boss.stunnedUntil > now()
+  };
+}
+
+function damageBoss(dmg, byName) {
+  if (!boss || !boss.alive || dmg <= 0) return;
+  boss.hp -= dmg;
+  if (boss.hp <= 0) defeatBoss();
+}
+
+function defeatBoss() {
+  boss.alive = false;
+  boss.hp = 0;
+  const s = settingsMod.get();
+  const defeated = { name: boss.name, level: boss.level };
+  // รางวัล: exp ทุกคนที่ยังรอด + ฮีลครึ่งหนึ่ง
+  for (const p of players.values()) {
+    if (p.alive) {
+      addExp(p, 100 * boss.level);
+      p.hp = Math.min(s.startHP, p.hp + Math.ceil(s.startHP / 2));
+    }
+  }
+  io.to('arena').emit('bossDefeated', defeated); // arena โชว์ค้าง 5 วิ
+  io.to('arena').emit('mc', { key: 'bossDefeated', params: defeated, priority: true });
+  stage++;
+  setTimeout(() => { if (gameActive) spawnBoss(); }, 5500);
+  pushHostState();
+}
+
+// ---------- ผู้เล่น ----------
 function ensurePlayer(uniqueId, nickname) {
   let p = players.get(uniqueId);
   if (!p) {
     p = {
-      id: uniqueId,
-      name: nickname || uniqueId,
+      id: uniqueId, name: nickname || uniqueId,
       spawned: false, alive: false,
-      hp: 0, mp: 0,
-      likeTotal: 0, nextGachaAt: Infinity,
+      hp: 0, exp: 0, level: 1,
+      likeTotal: 0, nextGachaAt: Infinity, respawnTarget: 0,
       lastLikeAt: now(),
       spriteIndex: 0,
       x: rand(FIELD.x1, FIELD.x2), y: rand(FIELD.y1, FIELD.y2),
       tx: 0, ty: 0, moving: false, facing: 1,
-      nextWanderAt: 0, nextAttackAt: 0,
+      nextWanderAt: 0,
       shields: 0, reflectUntil: 0
     };
     players.set(uniqueId, p);
@@ -40,19 +104,25 @@ function ensurePlayer(uniqueId, nickname) {
   return p;
 }
 
+function pub(p) {
+  return {
+    id: p.id, name: p.name, sprite: p.spriteIndex,
+    x: Math.round(p.x), y: Math.round(p.y), facing: p.facing,
+    hp: p.hp, maxHp: settingsMod.get().startHP,
+    level: p.level, exp: p.exp, expNeed: expNeed(p.level),
+    shields: p.shields, reflecting: p.reflectUntil > now()
+  };
+}
+
 function spawn(p) {
   const s = settingsMod.get();
-  p.spawned = true;
-  p.alive = true;
+  p.spawned = true; p.alive = true;
   p.hp = s.startHP;
-  p.spriteIndex = nextIdx % 20;
-  nextIdx++;
-  everSpawned++;
+  p.spriteIndex = nextIdx % 20; nextIdx++;
   p.lastLikeAt = now();
   p.nextGachaAt = p.likeTotal + s.likesPerGacha;
-  p.x = rand(FIELD.x1 + 100, FIELD.x2 - 100);
-  p.y = rand(FIELD.y1 + 50, FIELD.y2 - 50);
-  p.nextAttackAt = now() + randInt(3000, 8000);
+  p.x = rand(FIELD.x1 + 80, FIELD.x2 - 80);
+  p.y = rand(FIELD.y1 + 40, FIELD.y2 - 40);
   io.to('arena').emit('spawn', pub(p));
   io.to('arena').emit('mc', { key: 'welcome', params: { name: p.name }, priority: true });
   pushHostState();
@@ -62,80 +132,65 @@ function respawn(p) {
   const s = settingsMod.get();
   p.alive = true;
   p.hp = s.startHP;
-  p.shields = 0;
-  p.reflectUntil = 0;
+  p.shields = 0; p.reflectUntil = 0;
   p.lastLikeAt = now();
   p.nextGachaAt = p.likeTotal + s.likesPerGacha;
-  p.x = rand(FIELD.x1 + 100, FIELD.x2 - 100);
-  p.y = rand(FIELD.y1 + 50, FIELD.y2 - 50);
-  p.nextAttackAt = now() + randInt(3000, 8000);
+  p.x = rand(FIELD.x1 + 80, FIELD.x2 - 80);
+  p.y = rand(FIELD.y1 + 40, FIELD.y2 - 40);
   io.to('arena').emit('spawn', pub(p));
   io.to('arena').emit('mc', { key: 'welcome', params: { name: p.name }, priority: true });
   pushHostState();
 }
 
-function aliveList(excludeId) {
-  return [...players.values()].filter(p => p.alive && p.id !== excludeId);
-}
-
-function pub(p) {
-  return {
-    id: p.id, name: p.name, sprite: p.spriteIndex,
-    x: Math.round(p.x), y: Math.round(p.y), facing: p.facing,
-    hp: p.hp, maxHp: settingsMod.get().startHP, mp: p.mp,
-    shields: p.shields, reflecting: p.reflectUntil > now()
-  };
-}
-
-// ---------- damage & death ----------
-function applyDamage(target, dmg, attacker, type) {
-  if (!target.alive) return;
-  if (target.shields > 0) {
-    target.shields--;
-    io.to('arena').emit('blocked', { id: target.id });
-    return;
+function addExp(p, amount) {
+  p.exp += amount;
+  let leveled = false;
+  while (p.exp >= expNeed(p.level)) {
+    p.exp -= expNeed(p.level);
+    p.level++;
+    leveled = true;
   }
-  if (target.reflectUntil > now() && attacker && attacker.alive && type !== 'reflect') {
-    io.to('arena').emit('reflected', { from: target.id, to: attacker.id });
-    applyDamage(attacker, dmg, target, 'reflect');
-    return;
+  if (leveled) {
+    io.to('arena').emit('levelUp', { id: p.id, level: p.level });
+    io.to('arena').emit('mc', { key: 'levelUp', params: { name: p.name, level: p.level }, priority: true });
   }
-  target.hp -= dmg;
-  io.to('arena').emit('hit', { id: target.id, dmg, hp: Math.max(0, target.hp) });
-  if (target.hp <= 0) death(target, 'hp', attacker);
 }
 
-function death(p, cause, by) {
+function damageHero(p, dmg) {
+  if (!p.alive) return null;
+  if (p.shields > 0) {
+    p.shields--;
+    io.to('arena').emit('blocked', { id: p.id });
+    return { id: p.id, dmg: 0, blocked: true };
+  }
+  if (p.reflectUntil > now() && boss && boss.alive) {
+    io.to('arena').emit('reflected', { from: p.id, to: 'boss' });
+    damageBoss(dmg, p.name);
+    return { id: p.id, dmg: 0, reflected: true };
+  }
+  p.hp -= dmg;
+  if (p.hp <= 0) death(p, 'hp');
+  return { id: p.id, dmg, hp: Math.max(0, p.hp) };
+}
+
+function death(p, cause) {
   p.alive = false;
   p.hp = 0;
-  p.respawnTarget = p.likeTotal + settingsMod.get().likesToSpawn; // กดไลค์ครบอีกรอบ = เกิดใหม่
+  p.respawnTarget = p.likeTotal + settingsMod.get().likesToSpawn;
   io.to('arena').emit('death', { id: p.id, cause });
-  if (cause === 'inactive') {
-    io.to('arena').emit('mc', { key: 'inactiveDeath', params: { name: p.name }, priority: true });
-  } else {
-    io.to('arena').emit('mc', { key: 'ko', params: { name: p.name, by: by ? by.name : '' }, priority: true });
-  }
+  io.to('arena').emit('mc', {
+    key: cause === 'inactive' ? 'inactiveDeath' : 'koByBoss',
+    params: { name: p.name, boss: boss ? boss.name : '' }, priority: true
+  });
   pushHostState();
-  checkWinner();
 }
 
-let lastStandingId = null;
-function checkWinner() {
-  if (!gameActive) return;
-  const alive = aliveList();
-  if (alive.length > 1) { lastStandingId = null; return; }
-  // เหลือคนเดียว = ครองสนาม รอผู้ท้าชิงต่อ (ไม่มีหน้าจบเกม)
-  if (everSpawned >= 2 && alive.length === 1 && lastStandingId !== alive[0].id) {
-    lastStandingId = alive[0].id;
-    io.to('arena').emit('mc', { key: 'lastStanding', params: { name: alive[0].name }, priority: true });
-    pushHostState();
-  }
-}
+function aliveList() { return [...players.values()].filter(p => p.alive); }
 
-// ---------- gacha ----------
+// ---------- กาชา ----------
 function weightedPick(weights) {
   const entries = Object.entries(weights);
-  const total = entries.reduce((s, [, w]) => s + w, 0);
+  const total = entries.reduce((sum, [, w]) => sum + w, 0);
   let r = Math.random() * total;
   for (const [k, w] of entries) { r -= w; if (r <= 0) return k; }
   return entries[0][0];
@@ -147,8 +202,6 @@ function doGacha(p, tier) {
   const item = ITEM_DEFS[itemKey];
   io.to('arena').emit('gacha', { id: p.id, name: p.name, tier, item: itemKey });
   io.to('arena').emit('mc', { key: 'gachaItem', params: { name: p.name, item: itemKey, tier }, priority: true });
-
-  // ใช้ไอเทมอัตโนมัติ (หน่วงเล็กน้อยให้อนิเมชันไข่แตกก่อน)
   setTimeout(() => applyItem(p, itemKey, item, tier), 2600);
 }
 
@@ -159,33 +212,27 @@ function applyItem(p, itemKey, item, tier) {
     case 'heal': if (p.alive) p.hp = Math.min(s.startHP, p.hp + item.amount); break;
     case 'reflect': if (p.alive) p.reflectUntil = now() + item.seconds * 1000; break;
     case 'revive':
-      if (!p.alive && p.spawned) {
-        p.alive = true; p.hp = Math.ceil(s.startHP / 2);
-        p.lastLikeAt = now();
-        p.x = rand(FIELD.x1 + 100, FIELD.x2 - 100); p.y = rand(FIELD.y1 + 50, FIELD.y2 - 50);
-        roundOver = false;
-        io.to('arena').emit('spawn', pub(p));
-        io.to('arena').emit('mc', { key: 'revive', params: { name: p.name }, priority: true });
-      } else if (p.alive) { p.hp = s.startHP; }
+      if (!p.alive && p.spawned) { respawn(p); io.to('arena').emit('mc', { key: 'revive', params: { name: p.name }, priority: true }); }
+      else if (p.alive) p.hp = s.startHP;
       break;
     case 'special': {
-      if (!p.alive) break;
-      const targets = aliveList(p.id);
-      if (!targets.length) break;
-      const t = targets[randInt(0, targets.length - 1)];
-      p.facing = t.x > p.x ? 1 : -1;
-      io.to('arena').emit('attack', { from: p.id, to: t.id, type: 'special', tier, dmg: item.dmg });
-      io.to('arena').emit('mc', { key: 'special', params: { name: p.name, target: t.name, tier }, priority: true });
-      setTimeout(() => applyDamage(t, item.dmg, p, 'special'), 900);
+      if (!p.alive || !boss || !boss.alive) break;
+      const dmg = item.dmg * stage; // สเกลตามด่าน
+      p.facing = 1;
+      io.to('arena').emit('attack', { from: p.id, to: 'boss', type: 'special', tier, dmg });
+      io.to('arena').emit('mc', { key: 'special', params: { name: p.name, boss: boss.name, tier }, priority: true });
+      setTimeout(() => damageBoss(dmg, p.name), 900);
       break;
     }
-    case 'aoe': {
-      if (!p.alive) break;
-      const targets = aliveList(p.id);
-      if (!targets.length) break;
-      io.to('arena').emit('attack', { from: p.id, to: null, type: 'aoe', tier, dmg: item.dmg });
-      io.to('arena').emit('mc', { key: 'aoe', params: { name: p.name }, priority: true });
-      setTimeout(() => targets.forEach(t => applyDamage(t, item.dmg, p, 'special')), 1100);
+    case 'meteor': {
+      if (!p.alive || !boss || !boss.alive) break;
+      const dmg = item.dmg * stage;
+      io.to('arena').emit('attack', { from: p.id, to: 'boss', type: 'meteor', tier, dmg });
+      io.to('arena').emit('mc', { key: 'meteor', params: { name: p.name, boss: boss.name }, priority: true });
+      setTimeout(() => {
+        damageBoss(dmg, p.name);
+        if (boss && boss.alive) boss.stunnedUntil = now() + item.stunSec * 1000;
+      }, 1100);
       break;
     }
   }
@@ -200,30 +247,33 @@ function giftTier(diamonds) {
   return 'common';
 }
 
-// ---------- TikTok event handlers ----------
+// ---------- TikTok events ----------
 function onLike(uniqueId, nickname, count) {
   const s = settingsMod.get();
   const p = ensurePlayer(uniqueId, nickname);
   p.likeTotal += count;
-  p.mp += count;
   p.lastLikeAt = now();
   io.to('arena').emit('likeFeed', { name: p.name, count, kind: 'like' });
 
-  if (!p.spawned && p.likeTotal >= s.likesToSpawn) {
-    spawn(p);
-    p.nextGachaAt = p.likeTotal + s.likesPerGacha;
-    return;
+  if (!p.spawned && p.likeTotal >= s.likesToSpawn) { spawn(p); return; }
+  if (p.spawned && !p.alive && p.respawnTarget && p.likeTotal >= p.respawnTarget) { respawn(p); return; }
+  if (!p.alive || !p.spawned) return;
+
+  // ไลค์ = โจมตีบอส: 1 ไลค์ = 1 ครั้ง มีโอกาสพลาดตามเลเวล
+  if (boss && boss.alive) {
+    const chance = hitChance(p.level);
+    let hits = 0;
+    for (let i = 0; i < count; i++) if (Math.random() < chance) hits++;
+    const misses = count - hits;
+    const dmg = hits * perLikeDmg(p.level);
+    io.to('arena').emit('heroAttack', { from: p.id, dmg, hits, misses });
+    damageBoss(dmg, p.name);
   }
-  // ตายแล้วกดไลค์ครบอีกรอบ → คืนชีพเหมือนผู้เล่นใหม่
-  if (p.spawned && !p.alive && p.respawnTarget && p.likeTotal >= p.respawnTarget) {
-    respawn(p);
-    return;
-  }
-  if (p.spawned && p.alive) {
-    while (p.likeTotal >= p.nextGachaAt) {
-      p.nextGachaAt += s.likesPerGacha;
-      doGacha(p, 'common');
-    }
+  addExp(p, count * 2); // exp จากการโจมตี
+
+  while (p.likeTotal >= p.nextGachaAt) {
+    p.nextGachaAt += s.likesPerGacha;
+    doGacha(p, 'common');
   }
 }
 
@@ -231,111 +281,125 @@ function onGift(uniqueId, nickname, diamonds) {
   const p = ensurePlayer(uniqueId, nickname);
   p.lastLikeAt = now();
   io.to('arena').emit('likeFeed', { name: p.name, count: diamonds, kind: 'gift' });
-  if (!p.spawned) {
-    spawn(p);
-    p.nextGachaAt = p.likeTotal + settingsMod.get().likesPerGacha;
-  }
+  if (!p.spawned) spawn(p);
+  addExp(p, Math.min(500, diamonds)); // ของขวัญให้ exp ด้วย
   doGacha(p, giftTier(diamonds));
 }
 
+// ---------- บอสโจมตี (โซนเตือน → ฟาด, หลบได้ด้วยตำแหน่ง) ----------
+const ZONE_R = 150, WARN_MS = 1300, PULSES = 3, PULSE_GAP = 450;
+
+function bossTryAttack() {
+  const s = settingsMod.get();
+  const t = now();
+  if (!boss || !boss.alive || boss.stunnedUntil > t || t < boss.nextAttackAt || boss.mp < 30) return;
+  const targets = aliveList();
+  if (!targets.length) return;
+  const target = targets[randInt(0, targets.length - 1)];
+  boss.mp -= 30;
+  boss.nextAttackAt = t + randInt(boss.cooldown[0] * 1000, boss.cooldown[1] * 1000);
+  const zone = { x: target.x, y: target.y, r: ZONE_R };
+  io.to('arena').emit('bossTelegraph', { ...zone, warnMs: WARN_MS, targetId: target.id });
+
+  for (let i = 0; i < PULSES; i++) {
+    setTimeout(() => {
+      if (!boss || !boss.alive) return;
+      const victims = [];
+      for (const p of aliveList()) {
+        if (Math.hypot(p.x - zone.x, p.y - zone.y) <= zone.r) {
+          const r = damageHero(p, boss.dmg);
+          if (r) victims.push(r);
+        }
+      }
+      io.to('arena').emit('bossStrike', { x: zone.x, y: zone.y, r: zone.r, victims });
+    }, WARN_MS + i * PULSE_GAP);
+  }
+}
+
 // ---------- host controls ----------
-function hostStart() { gameActive = true; roundOver = false; io.to('arena').emit('gameState', { active: true }); pushHostState(); }
+function hostStart() { gameActive = true; if (!boss || !boss.alive) spawnBoss(); io.to('arena').emit('gameState', { active: true }); pushHostState(); }
 function hostEnd() { gameActive = false; io.to('arena').emit('gameState', { active: false }); pushHostState(); }
 function hostNewRound() {
-  players.clear(); nextIdx = 0; everSpawned = 0; roundOver = false; gameActive = true;
+  players.clear(); nextIdx = 0; stage = 1; gameActive = true;
   io.to('arena').emit('reset');
-  io.to('arena').emit('gameState', { active: true });
+  spawnBoss();
   pushHostState();
 }
 function hostKick(id) {
   const p = players.get(id);
-  if (p && p.alive) death(p, 'hp', null);
+  if (p && p.alive) death(p, 'hp');
   players.delete(id);
   io.to('arena').emit('remove', { id });
   pushHostState();
 }
 
-// ---------- loop ----------
+// ---------- game loop ----------
 function tick() {
   const s = settingsMod.get();
   const t = now();
-  const alive = aliveList();
+
+  if (gameActive && boss && boss.alive) {
+    boss.mp = Math.min(boss.maxMp, boss.mp + 0.25); // ฟื้น MP ~2.5/วินาที
+    bossTryAttack();
+  }
 
   for (const p of players.values()) {
     if (!p.alive) continue;
 
-    // ตายเพราะไม่ active (เฉพาะตอนเกมกำลังเล่นและยังไม่จบรอบ)
-    if (gameActive && t - p.lastLikeAt > s.inactivitySeconds * 1000) {
-      death(p, 'inactive', null);
-      continue;
-    }
+    if (gameActive && t - p.lastLikeAt > s.inactivitySeconds * 1000) { death(p, 'inactive'); continue; }
 
-    // เดินสุ่ม
+    // เดินสุ่ม — เลเวลสูงเดินไว (หลบไวขึ้นเองตามธรรมชาติ)
     if (t >= p.nextWanderAt) {
-      if (Math.random() < 0.75) {
+      if (Math.random() < 0.78) {
         p.tx = rand(FIELD.x1, FIELD.x2);
         p.ty = rand(FIELD.y1, FIELD.y2);
         p.moving = true;
-      } else {
-        p.moving = false; // ยืนพัก
-      }
-      p.nextWanderAt = t + randInt(1500, 4500);
+      } else p.moving = false;
+      p.nextWanderAt = t + randInt(1200, 4000);
     }
     if (p.moving) {
       const dx = p.tx - p.x, dy = p.ty - p.y;
       const d = Math.hypot(dx, dy);
-      const speed = 1.6; // px ต่อ tick (world units)
-      if (d < speed * 2) { p.moving = false; }
+      const speed = 1.6 * walkSpeed(p.level) * (TICK_MS / 16.7) * 1.6;
+      if (d < speed * 2) p.moving = false;
       else {
-        p.x += (dx / d) * speed * (TICK_MS / 16.7) * 1.6;
-        p.y += (dy / d) * speed * (TICK_MS / 16.7) * 1.6;
+        p.x += (dx / d) * speed;
+        p.y += (dy / d) * speed;
         p.facing = dx >= 0 ? 1 : -1;
-      }
-    }
-
-    // โจมตีธรรมดาอัตโนมัติ
-    if (gameActive && t >= p.nextAttackAt) {
-      p.nextAttackAt = t + randInt(3000, 8000);
-      if (p.mp >= s.basicAttackCost) {
-        const targets = alive.filter(o => o.id !== p.id);
-        if (targets.length) {
-          const target = targets[randInt(0, targets.length - 1)];
-          p.mp -= s.basicAttackCost;
-          p.facing = target.x > p.x ? 1 : -1;
-          const dmg = randInt(s.basicAttackMin, s.basicAttackMax);
-          io.to('arena').emit('attack', { from: p.id, to: target.id, type: 'basic', dmg });
-          setTimeout(() => applyDamage(target, dmg, p, 'basic'), 500);
-        }
       }
     }
   }
 
-  // broadcast snapshot
-  const snapshot = [...players.values()].filter(p => p.spawned && p.alive).map(pub);
+  const snapshot = {
+    players: [...players.values()].filter(p => p.spawned && p.alive).map(pub),
+    boss: pubBoss()
+  };
   io.to('arena').emit('state', snapshot);
 }
 
 function pushHostState() {
-  const s = settingsMod.get();
   io.to('host').emit('hostState', {
-    gameActive, roundOver,
+    gameActive, stage,
+    boss: pubBoss(),
     players: [...players.values()].map(p => ({
       id: p.id, name: p.name, spawned: p.spawned, alive: p.alive,
-      hp: p.hp, mp: p.mp, likeTotal: p.likeTotal, sprite: p.spriteIndex
+      hp: p.hp, level: p.level, likeTotal: p.likeTotal, sprite: p.spriteIndex
     })),
-    likesToSpawn: s.likesToSpawn
+    likesToSpawn: settingsMod.get().likesToSpawn
   });
 }
 
 function fullState() {
   return {
-    gameActive, roundOver,
-    players: [...players.values()].filter(p => p.spawned && p.alive).map(pub)
+    gameActive,
+    players: [...players.values()].filter(p => p.spawned && p.alive).map(pub),
+    boss: pubBoss()
   };
 }
 
 function init(ioInstance) {
   io = ioInstance;
+  if (!boss) spawnBoss();
   if (loopTimer) clearInterval(loopTimer);
   loopTimer = setInterval(tick, TICK_MS);
 }

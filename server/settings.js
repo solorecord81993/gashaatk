@@ -11,12 +11,18 @@ const DEFAULTS = {
   basicAttackMax: 10,
   // ช่วงเหรียญของขวัญ → ระดับกาชา
   rareMin: 1, epicMin: 100, legendaryMin: 1000,
+  // บอส
+  bossBaseHP: 500,        // HP บอสด่านแรก
+  bossHpMult: 1.5,        // ตัวคูณ HP ต่อด่าน
+  bossBaseDmg: 12,        // ดาเมจบอสด่านแรก (โตขึ้นตามด่าน)
+  bossCooldownMin: 8,     // วินาที cooldown ต่ำสุดของท่าบอส
+  bossCooldownMax: 15,
   // อัตราดรอป (น้ำหนักสุ่ม) ต่อระดับ
   drops: {
     common:    { shield1: 30, healSmall: 30, specLight: 40 },
     rare:      { shield3: 30, healBig: 30, specMid: 40 },
     epic:      { reflect: 40, specHeavy: 60 },
-    legendary: { aoe: 35, revive: 25, ultimate: 40 }
+    legendary: { meteor: 35, revive: 25, ultimate: 40 }
   },
   // ไฟล์ asset ที่อัปโหลด (URL) — null = ใช้ default ในตัว
   assets: {
@@ -27,18 +33,19 @@ const DEFAULTS = {
   }
 };
 
+// special = โจมตีบอส (ดาเมจ x ด่าน), meteor = ดาเมจหนัก + สตันบอส
 const ITEM_DEFS = {
   shield1:  { kind: 'shield', n: 1 },
   shield3:  { kind: 'shield', n: 3 },
   healSmall:{ kind: 'heal', amount: 10 },
   healBig:  { kind: 'heal', amount: 30 },
-  specLight:{ kind: 'special', dmg: 15, tier: 'common' },
-  specMid:  { kind: 'special', dmg: 25, tier: 'rare' },
-  specHeavy:{ kind: 'special', dmg: 40, tier: 'epic' },
+  specLight:{ kind: 'special', dmg: 30, tier: 'common' },
+  specMid:  { kind: 'special', dmg: 60, tier: 'rare' },
+  specHeavy:{ kind: 'special', dmg: 120, tier: 'epic' },
   reflect:  { kind: 'reflect', seconds: 10 },
-  aoe:      { kind: 'aoe', dmg: 30, tier: 'legendary' },
+  meteor:   { kind: 'meteor', dmg: 150, stunSec: 4, tier: 'legendary' },
   revive:   { kind: 'revive' },
-  ultimate: { kind: 'special', dmg: 60, tier: 'legendary' }
+  ultimate: { kind: 'special', dmg: 250, tier: 'legendary' }
 };
 
 let settings = JSON.parse(JSON.stringify(DEFAULTS));
