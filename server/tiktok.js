@@ -8,6 +8,17 @@ let currentUser = null;
 let status = { connected: false, username: null, message: 'idle' };
 let reconnectTimer = null;
 let wantConnected = false;
+let failCount = 0;
+
+function friendlyError(msg) {
+  if (/retry-after|rate.?limit|429|too many/i.test(msg)) {
+    return 'โดนจำกัดจำนวนครั้ง (rate limit) — รอ 1-2 นาทีแล้วกดเชื่อมต่อใหม่ หรือใส่ SIGN_API_KEY เพื่อเลี่ยงปัญหานี้ถาวร';
+  }
+  if (/room id|offline|not.*live|user_not_found/i.test(msg)) {
+    return 'หาห้องไลฟ์ไม่เจอ — เช็คว่าเปิดไลฟ์อยู่จริงและ username ถูกต้อง';
+  }
+  return msg;
+}
 
 function setStatus(patch) {
   status = { ...status, ...patch };
@@ -42,13 +53,16 @@ async function connect(username) {
   await disconnect();
   currentUser = username;
   wantConnected = true;
+  failCount = 0;
   return tryConnect();
 }
 
 async function tryConnect() {
   setStatus({ username: currentUser, message: 'connecting' });
   try {
-    conn = new TikTokLiveConnection(currentUser, {});
+    const opts = {};
+    if (process.env.SIGN_API_KEY) opts.signApiKey = process.env.SIGN_API_KEY;
+    conn = new TikTokLiveConnection(currentUser, opts);
 
     conn.on(WebcastEvent.LIKE, (d) => {
       try {
@@ -100,10 +114,12 @@ async function tryConnect() {
 
     const state = await conn.connect();
     const roomId = state && (state.roomId || state.room_id);
+    failCount = 0;
     setStatus({ connected: true, message: 'connected', roomId });
     return { ok: true };
   } catch (e) {
-    const msg = String((e && e.message) || e).slice(0, 300);
+    const msg = friendlyError(String((e && e.message) || e).slice(0, 300));
+    failCount++;
     setStatus({ connected: false, message: 'failed: ' + msg });
     scheduleReconnect();
     return { ok: false, error: msg };
@@ -112,10 +128,18 @@ async function tryConnect() {
 
 function scheduleReconnect() {
   if (!wantConnected || reconnectTimer) return;
+  if (failCount > 6) {
+    // พลาดติดกันหลายครั้ง — หยุด retry กันโดนแบนหนักขึ้น รอ host กดเชื่อมต่อเอง
+    wantConnected = false;
+    setStatus({ connected: false, message: 'failed: หยุดลองอัตโนมัติแล้ว — รอสัก 2 นาทีแล้วกดเชื่อมต่อใหม่' });
+    return;
+  }
+  // เว้นระยะแบบทวีคูณ: 10s, 20s, 40s, 80s, สูงสุด 2 นาที
+  const delay = Math.min(120000, 10000 * Math.pow(2, Math.max(0, failCount - 1)));
   reconnectTimer = setTimeout(async () => {
     reconnectTimer = null;
     if (wantConnected) await tryConnect();
-  }, 5000);
+  }, delay);
 }
 
 async function disconnect() {
