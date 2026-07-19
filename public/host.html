@@ -86,6 +86,12 @@
 </div>
 
 <div class="card">
+  <h2 data-i18n="evTitle"></h2>
+  <div id="evLog" style="font-size:12px;line-height:1.8;color:var(--mut);max-height:180px;overflow:auto"></div>
+  <div class="note" data-i18n="evNote"></div>
+</div>
+
+<div class="card">
   <h2 data-i18n="simTitle"></h2>
   <label data-i18n="simUser"></label>
   <input id="simUser" value="tester1" autocapitalize="none">
@@ -106,7 +112,8 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const I18N = {
-  th: { title:'ห้องควบคุม', connTitle:'เชื่อมต่อ TIKTOK LIVE', userLabel:'TikTok username ของบัญชีที่กำลังไลฟ์อยู่',
+  th: {evTitle:'อีเวนต์สดจาก TIKTOK (ดีบัก)', evNote:'ไลค์/ของขวัญจริงที่ server ได้รับ — ถ้าคนดูกดไลค์แล้วไม่ขึ้นตรงนี้ = ปัญหาอยู่ที่การเชื่อมต่อ ไม่ใช่ตัวเกม',
+     title:'ห้องควบคุม', connTitle:'เชื่อมต่อ TIKTOK LIVE', userLabel:'TikTok username ของบัญชีที่กำลังไลฟ์อยู่',
     connect:'เชื่อมต่อ', disconnect:'ตัดการเชื่อมต่อ',
     connNote:'ต้องเปิดไลฟ์บน TikTok ก่อน แล้วค่อยกดเชื่อมต่อ · ถ้าเพิ่งเปิดเว็บหลังพักนาน Render อาจใช้เวลาตื่น ~50 วินาที',
     gameTitle:'ควบคุมเกม', start:'เริ่มเกม', end:'หยุดเกม', newRound:'เริ่มรอบใหม่ (ล้างทุกคน)',
@@ -117,7 +124,8 @@ const I18N = {
     stActive:'▶️ เกมกำลังเล่น', stPaused:'⏸️ เกมหยุดอยู่ — กด "เริ่มเกม"', stOver:'🏆 จบรอบแล้ว — กด "เริ่มรอบใหม่"',
     kick:'เตะ',
     st:{ idle:'ยังไม่เชื่อมต่อ', connecting:'กำลังเชื่อมต่อ...', connected:'เชื่อมต่อแล้ว ✅', disconnected:'หลุด! กำลังต่อใหม่...', streamEnd:'ไลฟ์จบแล้ว' } },
-  en: { title:'Host Console', connTitle:'CONNECT TIKTOK LIVE', userLabel:'TikTok username currently live',
+  en: {evTitle:'LIVE TIKTOK EVENTS (debug)', evNote:'Real likes/gifts as received — if viewers like and nothing shows here, the issue is the connection, not the game',
+     title:'Host Console', connTitle:'CONNECT TIKTOK LIVE', userLabel:'TikTok username currently live',
     connect:'Connect', disconnect:'Disconnect',
     connNote:'Start your TikTok live first, then connect · After long idle, Render free may take ~50s to wake',
     gameTitle:'Game control', start:'Start game', end:'Pause game', newRound:'New round (clear all)',
@@ -128,7 +136,8 @@ const I18N = {
     stActive:'▶️ Game running', stPaused:'⏸️ Paused — press "Start game"', stOver:'🏆 Round over — press "New round"',
     kick:'Kick',
     st:{ idle:'Not connected', connecting:'Connecting...', connected:'Connected ✅', disconnected:'Dropped! Reconnecting...', streamEnd:'Stream ended' } },
-  ja: { title:'ホスト管理', connTitle:'TIKTOK LIVE 接続', userLabel:'配信中のTikTokユーザー名',
+  ja: {evTitle:'TIKTOKライブイベント（デバッグ）', evNote:'受信した実際のいいね／ギフト — 表示されなければ接続の問題です',
+     title:'ホスト管理', connTitle:'TIKTOK LIVE 接続', userLabel:'配信中のTikTokユーザー名',
     connect:'接続', disconnect:'切断',
     connNote:'先にTikTokライブを開始してから接続してください · 長時間放置後は起動に約50秒かかる場合があります',
     gameTitle:'ゲーム操作', start:'ゲーム開始', end:'一時停止', newRound:'新ラウンド（全消去）',
@@ -157,6 +166,15 @@ let lastState = null;
 socket.on('connect', ()=>socket.emit('joinHost'));
 socket.on('connectionStatus', (s)=>{ lastStatus=s; renderStatus(); });
 socket.on('hostState', (s)=>{ lastState=s; renderState(); });
+socket.on('ttEvent', (e)=>{
+  const box=document.getElementById('evLog');
+  const t=new Date().toLocaleTimeString();
+  const line=document.createElement('div');
+  line.textContent = e.kind==='noid' ? `[${t}] ⚠️ event ไม่มีข้อมูลผู้ใช้ (${e.info})`
+    : `[${t}] ${e.kind==='gift'?'🎁':'❤️'} ${e.name} (@${e.id}) +${e.count}`;
+  box.prepend(line);
+  while(box.children.length>15) box.removeChild(box.lastChild);
+});
 
 function renderStatus(){
   const dot=document.getElementById('dot');
