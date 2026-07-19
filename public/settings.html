@@ -102,7 +102,7 @@
   <h2 data-i18n="imgTitle"></h2>
   <label data-i18n="bgLabel"></label>
   <div class="fileRow">
-    <button class="btn ghost" onclick="pick('background','image/*')" data-i18n="upload"></button>
+    <button class="btn ghost" onclick="pick('background','.png,.jpg,.jpeg,.webp,image/*')" data-i18n="upload"></button>
     <span class="st" id="st_background"></span>
     <button class="btn ghost" onclick="clearAsset('background')">✕</button>
   </div>
@@ -219,7 +219,7 @@ function renderSounds(){
         <button class="btn ghost">✕</button>
       </div>`;
     const [up,clr]=row.querySelectorAll('button');
-    up.onclick=()=>pick(k==='bgm'?'bgm':'sfx.'+k,'audio/*');
+    up.onclick=()=>pick(k==='bgm'?'bgm':'sfx.'+k,''); // ไม่จำกัดชนิด — iOS จะโชว์ทุกไฟล์ แล้วค่อยตรวจนามสกุลทีหลัง
     clr.onclick=()=>clearAsset(k==='bgm'?'bgm':'sfx.'+k);
     wrap.appendChild(row);
   }
@@ -233,7 +233,7 @@ function renderSprites(){
     const slot=document.createElement('div');
     slot.className='slot'+(url?' has':'');
     slot.innerHTML=`<span class="num">${i+1}</span>${url?`<img src="${url}">`:'📦'}<button class="clear">✕</button>`;
-    slot.onclick=()=>pick('sprites.'+i,'image/*');
+    slot.onclick=()=>pick('sprites.'+i,'.png,.jpg,.jpeg,.webp,image/*');
     slot.querySelector('.clear').onclick=(e)=>{e.stopPropagation();clearAsset('sprites.'+i);};
     grid.appendChild(slot);
   }
@@ -249,6 +249,12 @@ function pick(target,accept){
 document.getElementById('filePicker').onchange=async (e)=>{
   const file=e.target.files[0];
   if(!file||!pickTarget) return;
+  // ช่องเสียง: ตรวจนามสกุลหลังเลือก
+  const isSound = pickTarget==='bgm' || pickTarget.startsWith('sfx.');
+  if(isSound && !/\.(mp3|m4a|aac|wav|ogg)$/i.test(file.name)){
+    alert('ไฟล์เสียงต้องเป็น mp3 / m4a / aac / wav เท่านั้น (ไฟล์ที่เลือก: '+file.name+')');
+    return;
+  }
   const dataUrl=await new Promise((res,rej)=>{
     const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file);
   });

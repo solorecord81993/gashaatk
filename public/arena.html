@@ -95,13 +95,6 @@
   #winTitle{font-size:15px;letter-spacing:4px;color:var(--neon-cyan);font-weight:600}
   @keyframes crownFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
 
-  /* ---------- waiting hint ---------- */
-  #hint{position:fixed;left:0;right:0;top:38%;z-index:10;text-align:center;pointer-events:none;
-    transition:opacity .6s}
-  #hint .h1{font-size:22px;font-weight:800;text-shadow:0 0 22px rgba(49,230,255,.6)}
-  #hint .h2{font-size:14px;color:#cbb8ff;margin-top:6px}
-  #hint.off{opacity:0}
-
   /* ---------- start overlay ---------- */
   #startOverlay{position:fixed;inset:0;z-index:50;background:var(--night);
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
@@ -134,11 +127,6 @@
 </div>
 
 <div id="feed"></div>
-
-<div id="hint">
-  <div class="h1" data-i18n="hintTitle"></div>
-  <div class="h2" data-i18n="hintSub"></div>
-</div>
 
 <div id="mcBar">
   <div id="mcFace">🎙️</div>
@@ -779,12 +767,10 @@ socket.on('init', (d) => {
   applyLang();
   applyCustomBg();
   d.players.forEach(addChar);
-  refreshHint();
 });
 socket.on('configChanged', (c) => { config = c; applyLang(); applyCustomBg(); });
 socket.on('state', (list) => {
   list.forEach(updateCharSafe);
-  refreshHint(list.length);
 });
 function updateCharSafe(d) { if (chars.has(d.id)) updateChar(d); else addChar(d); }
 socket.on('spawn', (d) => { addChar(d); document.getElementById('winner').classList.remove('show'); });
@@ -830,15 +816,10 @@ socket.on('winner', (ev) => {
 socket.on('reset', () => {
   for (const id of [...chars.keys()]) removeChar(id, false);
   document.getElementById('winner').classList.remove('show');
-  refreshHint(0);
 });
 socket.on('likeFeed', addFeed);
 socket.on('mc', (ev) => { if (started) mcSay(ev.key, ev.params, ev.priority); });
 
-function refreshHint(n) {
-  const count = n !== undefined ? n : chars.size;
-  document.getElementById('hint').classList.toggle('off', count > 0);
-}
 function confettiBurst() {
   for (let i = 0; i < 5; i++) setTimeout(() =>
     spawnBurst(200 + Math.random() * 600, 400 + Math.random() * 400,
