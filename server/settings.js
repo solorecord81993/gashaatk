@@ -27,6 +27,7 @@ const DEFAULTS = {
   // ไฟล์ asset ที่อัปโหลด (URL) — null = ใช้ default ในตัว
   assets: {
     background: null,
+    boss: null,
     bgm: null,
     sfx: { basic: null, gacha: null, spec_common: null, spec_rare: null, spec_epic: null, spec_legendary: null },
     sprites: Array(20).fill(null)

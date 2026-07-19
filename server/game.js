@@ -20,7 +20,7 @@ function rand(min, max) { return min + Math.random() * (max - min); }
 function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
 
 // ---------- เลเวล/ค่าพลังฮีโร่ ----------
-function expNeed(level) { return 100 + (level - 1) * 80; }        // exp ที่ต้องใช้ไปเลเวลถัดไป
+function expNeed(level) { return 150 + (level - 1) * 120; }       // exp ที่ต้องใช้ไปเลเวลถัดไป
 function perLikeDmg(level) { return 1 + Math.floor(level / 2); }  // ดาเมจต่อ 1 ไลค์
 function hitChance(level) { return Math.min(0.95, 0.55 + level * 0.04); } // โอกาสโจมตีโดน
 function walkSpeed(level) { return Math.min(2.2, 1 + level * 0.04); }     // ตัวคูณความเร็วเดิน/หลบ
@@ -71,7 +71,7 @@ function defeatBoss() {
   // รางวัล: exp ทุกคนที่ยังรอด + ฮีลครึ่งหนึ่ง
   for (const p of players.values()) {
     if (p.alive) {
-      addExp(p, 100 * boss.level);
+      addExp(p, 60 * boss.level);
       p.hp = Math.min(s.startHP, p.hp + Math.ceil(s.startHP / 2));
     }
   }
@@ -90,7 +90,7 @@ function ensurePlayer(uniqueId, nickname) {
       id: uniqueId, name: nickname || uniqueId,
       spawned: false, alive: false,
       hp: 0, exp: 0, level: 1,
-      likeTotal: 0, nextGachaAt: Infinity, respawnTarget: 0,
+      likeTotal: 0, respawnTarget: 0,
       lastLikeAt: now(),
       spriteIndex: 0,
       x: rand(FIELD.x1, FIELD.x2), y: rand(FIELD.y1, FIELD.y2),
@@ -120,7 +120,6 @@ function spawn(p) {
   p.hp = s.startHP;
   p.spriteIndex = nextIdx % 20; nextIdx++;
   p.lastLikeAt = now();
-  p.nextGachaAt = p.likeTotal + s.likesPerGacha;
   p.x = rand(FIELD.x1 + 80, FIELD.x2 - 80);
   p.y = rand(FIELD.y1 + 40, FIELD.y2 - 40);
   io.to('arena').emit('spawn', pub(p));
@@ -134,7 +133,6 @@ function respawn(p) {
   p.hp = s.startHP;
   p.shields = 0; p.reflectUntil = 0;
   p.lastLikeAt = now();
-  p.nextGachaAt = p.likeTotal + s.likesPerGacha;
   p.x = rand(FIELD.x1 + 80, FIELD.x2 - 80);
   p.y = rand(FIELD.y1 + 40, FIELD.y2 - 40);
   io.to('arena').emit('spawn', pub(p));
@@ -269,12 +267,8 @@ function onLike(uniqueId, nickname, count) {
     io.to('arena').emit('heroAttack', { from: p.id, dmg, hits, misses });
     damageBoss(dmg, p.name);
   }
-  addExp(p, count * 2); // exp จากการโจมตี
+  addExp(p, count); // exp จากการโจมตี (1 ไลค์ = 1 exp)
 
-  while (p.likeTotal >= p.nextGachaAt) {
-    p.nextGachaAt += s.likesPerGacha;
-    doGacha(p, 'common');
-  }
 }
 
 function onGift(uniqueId, nickname, diamonds) {
@@ -282,12 +276,12 @@ function onGift(uniqueId, nickname, diamonds) {
   p.lastLikeAt = now();
   io.to('arena').emit('likeFeed', { name: p.name, count: diamonds, kind: 'gift' });
   if (!p.spawned) spawn(p);
-  addExp(p, Math.min(500, diamonds)); // ของขวัญให้ exp ด้วย
+  addExp(p, Math.min(150, diamonds)); // ของขวัญให้ exp ด้วย (จำกัดเพดานกันเลเวลพุ่ง)
   doGacha(p, giftTier(diamonds));
 }
 
 // ---------- บอสโจมตี (โซนเตือน → ฟาด, หลบได้ด้วยตำแหน่ง) ----------
-const ZONE_R = 150, WARN_MS = 1300, PULSES = 3, PULSE_GAP = 450;
+const ZONE_RX = 165, ZONE_RY = 75, WARN_MS = 1300, PULSES = 3, PULSE_GAP = 450; // วงรีแนวนอน (มุมมอง 3 มิติ)
 
 function bossTryAttack() {
   const s = settingsMod.get();
@@ -298,7 +292,7 @@ function bossTryAttack() {
   const target = targets[randInt(0, targets.length - 1)];
   boss.mp -= 30;
   boss.nextAttackAt = t + randInt(boss.cooldown[0] * 1000, boss.cooldown[1] * 1000);
-  const zone = { x: target.x, y: target.y, r: ZONE_R };
+  const zone = { x: target.x, y: target.y, rx: ZONE_RX, ry: ZONE_RY };
   io.to('arena').emit('bossTelegraph', { ...zone, warnMs: WARN_MS, targetId: target.id });
 
   for (let i = 0; i < PULSES; i++) {
@@ -306,12 +300,13 @@ function bossTryAttack() {
       if (!boss || !boss.alive) return;
       const victims = [];
       for (const p of aliveList()) {
-        if (Math.hypot(p.x - zone.x, p.y - zone.y) <= zone.r) {
+        const nx = (p.x - zone.x) / zone.rx, ny = (p.y - zone.y) / zone.ry;
+        if (nx * nx + ny * ny <= 1) { // อยู่ในวงรี
           const r = damageHero(p, boss.dmg);
           if (r) victims.push(r);
         }
       }
-      io.to('arena').emit('bossStrike', { x: zone.x, y: zone.y, r: zone.r, victims });
+      io.to('arena').emit('bossStrike', { x: zone.x, y: zone.y, rx: zone.rx, ry: zone.ry, victims });
     }, WARN_MS + i * PULSE_GAP);
   }
 }
