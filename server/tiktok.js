@@ -49,7 +49,12 @@ async function tryConnect() {
     conn.on(WebcastEvent.LIKE, (d) => {
       try {
         const id = getUniqueId(d);
-        if (!id) return;
+        if (!id) {
+          console.log('[tiktok] like without user, keys:', Object.keys(d).join(','));
+          io.to('host').emit('ttEvent', { kind: 'noid', info: 'like' });
+          return;
+        }
+        io.to('host').emit('ttEvent', { kind: 'like', id, name: getNickname(d), count: Number(d.likeCount || 1) });
         game.onLike(String(id), getNickname(d), Number(d.likeCount || 1));
       } catch (e) { console.error('[tiktok] like handler:', e.message); }
     });
@@ -57,7 +62,11 @@ async function tryConnect() {
     conn.on(WebcastEvent.GIFT, (d) => {
       try {
         const id = getUniqueId(d);
-        if (!id) return;
+        if (!id) {
+          console.log('[tiktok] gift without user, keys:', Object.keys(d).join(','));
+          io.to('host').emit('ttEvent', { kind: 'noid', info: 'gift' });
+          return;
+        }
         const giftType = getGiftType(d);
         // gift แบบ streak/combo: นับเมื่อจบ combo เท่านั้น
         if (giftType === 1 && !d.repeatEnd) return;
@@ -65,6 +74,7 @@ async function tryConnect() {
         const repeat = Number(d.repeatCount || 1);
         const total = giftType === 1 ? per * repeat : per;
         if (total <= 0) return;
+        io.to('host').emit('ttEvent', { kind: 'gift', id, name: getNickname(d), count: total });
         game.onGift(String(id), getNickname(d), total);
       } catch (e) { console.error('[tiktok] gift handler:', e.message); }
     });

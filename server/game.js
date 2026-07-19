@@ -58,6 +58,22 @@ function spawn(p) {
   pushHostState();
 }
 
+function respawn(p) {
+  const s = settingsMod.get();
+  p.alive = true;
+  p.hp = s.startHP;
+  p.shields = 0;
+  p.reflectUntil = 0;
+  p.lastLikeAt = now();
+  p.nextGachaAt = p.likeTotal + s.likesPerGacha;
+  p.x = rand(FIELD.x1 + 100, FIELD.x2 - 100);
+  p.y = rand(FIELD.y1 + 50, FIELD.y2 - 50);
+  p.nextAttackAt = now() + randInt(3000, 8000);
+  io.to('arena').emit('spawn', pub(p));
+  io.to('arena').emit('mc', { key: 'welcome', params: { name: p.name }, priority: true });
+  pushHostState();
+}
+
 function aliveList(excludeId) {
   return [...players.values()].filter(p => p.alive && p.id !== excludeId);
 }
@@ -92,6 +108,7 @@ function applyDamage(target, dmg, attacker, type) {
 function death(p, cause, by) {
   p.alive = false;
   p.hp = 0;
+  p.respawnTarget = p.likeTotal + settingsMod.get().likesToSpawn; // กดไลค์ครบอีกรอบ = เกิดใหม่
   io.to('arena').emit('death', { id: p.id, cause });
   if (cause === 'inactive') {
     io.to('arena').emit('mc', { key: 'inactiveDeath', params: { name: p.name }, priority: true });
@@ -195,6 +212,11 @@ function onLike(uniqueId, nickname, count) {
   if (!p.spawned && p.likeTotal >= s.likesToSpawn) {
     spawn(p);
     p.nextGachaAt = p.likeTotal + s.likesPerGacha;
+    return;
+  }
+  // ตายแล้วกดไลค์ครบอีกรอบ → คืนชีพเหมือนผู้เล่นใหม่
+  if (p.spawned && !p.alive && p.respawnTarget && p.likeTotal >= p.respawnTarget) {
+    respawn(p);
     return;
   }
   if (p.spawned && p.alive) {
