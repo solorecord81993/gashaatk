@@ -203,9 +203,9 @@ const I18N = {
       rules: [
         'กดไลค์ครบ {spawn} ครั้ง รับตัวละครมาร่วมล่าบอส!',
         'ไลค์ 1 ครั้ง = โจมตีบอส 1 ที ยิ่งเลเวลสูงยิ่งแรงยิ่งแม่น!',
-        'ไลค์ทุก {gacha} ครั้ง สุ่มกาชาปองรับไอเทมฟรี!',
-        'ส่งของขวัญ ลุ้นท่าไม้ตายระดับตำนานถล่มบอส!',
-        'ระวังวงแดง! บอสจะฟาดตรงนั้น! และอย่าหยุดไลค์เกิน {inactive} วิ ไม่งั้นตัวละครตาย!'
+        'ส่งของขวัญสิ! ได้หมุนกาชาปองทันที ลุ้นโล่ ยาฟื้นฟู ท่าไม้ตาย!',
+        'ของขวัญ 100 เหรียญขึ้นไปได้ระดับ Epic! 1,000 ขึ้นไปได้ Legendary อุกกาบาตสตันบอส!',
+        'ระวังวงแดง! บอสจะฟาดตรงนั้น รีบเดินหนี! และอย่าหยุดไลค์เกิน {inactive} วิ ไม่งั้นตัวละครตาย!'
       ]
     }
   },
@@ -231,9 +231,9 @@ const I18N = {
       rules: [
         'Tap {spawn} likes to spawn your hero and join the raid!',
         '1 like = 1 attack on the boss. Higher level = more damage and accuracy!',
-        'Every {gacha} likes rolls a free gacha item!',
-        'Send gifts for legendary special attacks on the boss!',
-        'Dodge the red circles! And never stop liking for {inactive}s or your hero dies!'
+        'Send a gift to roll the gacha instantly — shields, heals, special attacks!',
+        'Gifts of 100+ coins give Epic items! 1,000+ gives Legendary — a meteor that stuns the boss!',
+        'Dodge the red zones! And never stop liking for {inactive}s or your hero dies!'
       ]
     }
   },
@@ -259,9 +259,9 @@ const I18N = {
       rules: [
         'いいねを{spawn}回タップしてキャラをゲット、レイドに参加！',
         'いいね1回＝ボスへ攻撃1回。レベルが高いほど強く正確！',
-        'いいね{gacha}回ごとに無料ガチャ！',
-        'ギフトを送ってレジェンド級の必殺技をボスに！',
-        '赤い円に注意！{inactive}秒いいねが止まるとキャラ死亡！'
+        'ギフトを送ると即ガチャ！シールド・回復・必殺技をゲット！',
+        'コイン100以上のギフトはエピック級！1,000以上でレジェンド級メテオ＋ボススタン！',
+        '赤いゾーンに注意！{inactive}秒いいねが止まるとキャラ死亡！'
       ]
     }
   }
@@ -597,7 +597,19 @@ function buildBoss(b) {
   if (!b) return;
   bossData = b;
   if (bossC) { bossC.destroy({ children: true }); bossC = null; }
-  bossC = buildBossVisual(b.level);
+  const customBoss = config && config.assets && config.assets.boss;
+  if (customBoss) {
+    bossC = new PIXI.Container();
+    const sh = new PIXI.Graphics().beginFill(0x000000, .4).drawEllipse(0, 12, 155, 34).endFill();
+    const sp = PIXI.Sprite.from(customBoss);
+    sp.anchor.set(.5, 1); sp.y = 14;
+    const fit = () => { if (sp.texture.height > 2) sp.scale.set(340 / sp.texture.height); };
+    if (sp.texture.baseTexture.valid) fit(); else sp.texture.baseTexture.on('loaded', fit);
+    bossC.addChild(sh, sp);
+    bossC.gfx = sp;
+  } else {
+    bossC = buildBossVisual(b.level);
+  }
   bossC.x = b.x; bossC.y = b.y;
   bossC.baseScale = Math.min(1.45, 1 + b.level * 0.03);
   bossC.animT = 0;
@@ -942,14 +954,33 @@ socket.on('heroAttack', (ev) => {
 // บอสเตือนโซนโจมตี (วงแดงกะพริบ)
 socket.on('bossTelegraph', (ev) => {
   SFX.warn();
+  // บอสเงื้อตัวเตรียมปล่อยพลัง
+  if (bossC) {
+    let bt = 0;
+    const btick = (delta) => {
+      bt += delta / 60;
+      bossC.baseScale = Math.min(1.45, 1 + (bossData ? bossData.level : 1) * 0.03) * (1 + Math.sin(Math.min(bt / .5, 1) * Math.PI) * 0.12);
+      if (bt >= .5) { bossC.baseScale = Math.min(1.45, 1 + (bossData ? bossData.level : 1) * 0.03); app.ticker.remove(btick); }
+    };
+    app.ticker.add(btick);
+  }
+  // วงรีเตือนบนพื้นแบบมีมิติ (แนวนอน) + วงในหดเข้า
+  const rx = ev.rx || ev.r || 160, ry = ev.ry || Math.round((ev.r || 160) * .45);
   const g = new PIXI.Graphics();
   fxLayer.addChild(g);
-  let t = 0; const dur = ev.warnMs / 1000 + 1.6; // เตือน + ช่วงฟาด
+  let t = 0; const dur = ev.warnMs / 1000 + 1.6;
+  const warnDur = ev.warnMs / 1000;
   const tick = (delta) => {
     t += delta / 60;
     g.clear();
-    const a = .18 + .16 * Math.abs(Math.sin(t * 14));
-    g.lineStyle(5, 0xff3040, .95).beginFill(0xff3040, a).drawCircle(ev.x, ev.y, ev.r).endFill();
+    const a = .16 + .14 * Math.abs(Math.sin(t * 14));
+    // วงนอก
+    g.lineStyle(5, 0xff3040, .95).beginFill(0xff3040, a).drawEllipse(ev.x, ev.y, rx, ry).endFill();
+    // วงในหดลงตามเวลานับถอยหลัง (บอกจังหวะฟาด)
+    const k = Math.max(0, 1 - t / warnDur);
+    if (k > 0) g.lineStyle(3, 0xffb3c0, .9).drawEllipse(ev.x, ev.y, rx * k, ry * k);
+    // เส้นกากบาทกลาง
+    g.lineStyle(2, 0xff3040, .5).moveTo(ev.x - rx, ev.y).lineTo(ev.x + rx, ev.y);
     if (t >= dur) { app.ticker.remove(tick); g.destroy(); }
   };
   app.ticker.add(tick);
@@ -957,19 +988,38 @@ socket.on('bossTelegraph', (ev) => {
 
 // บอสฟาดลงโซน
 socket.on('bossStrike', (ev) => {
-  spawnBurst(ev.x, ev.y, 0xff5030, 20, 7);
-  if (!ev.victims || !ev.victims.length) {
-    floatText(ev.x, ev.y - 40, 'MISS', 0xaaaaaa, 26);
-    return;
-  }
-  SFX.hit();
-  for (const v of ev.victims) {
-    const c = chars.get(v.id);
-    if (!c) continue;
-    if (v.blocked) { flashTint(c, 0x9fd8ff); SFX.block(); floatText(c.x, c.y - 170, 'BLOCK', 0x9fd8ff, 22); }
-    else if (v.reflected) { spawnBurst(c.x, c.y - 100, 0xffffff, 12, 4); floatText(c.x, c.y - 170, 'REFLECT!', 0xffffff, 22); }
-    else { flashTint(c, 0xff5c5c); floatText(c.x, c.y - 170, '-' + v.dmg, 0xff6b6b, 26); }
-  }
+  // ลูกไฟพุ่งจากบอสไปยังโซน แล้วค่อยระเบิด+คิดดาเมจ
+  const from = bossC ? { x: bossC.x, y: bossC.y - 150 } : { x: 500, y: 600 };
+  const ball = new PIXI.Graphics().beginFill(0xff5030).drawCircle(0, 0, 20).endFill();
+  const glow = new PIXI.Graphics().beginFill(0xff9060, .35).drawCircle(0, 0, 36).endFill();
+  ball.addChildAt(glow, 0);
+  ball.x = from.x; ball.y = from.y;
+  fxLayer.addChild(ball);
+  let t = 0; const dur = .3;
+  const tick = (delta) => {
+    t += delta / 60 / dur;
+    if (t >= 1) {
+      app.ticker.remove(tick); ball.destroy();
+      spawnBurst(ev.x, ev.y, 0xff5030, 22, 8);
+      spawnBurst(ev.x, ev.y - 20, 0xffb060, 12, 5);
+      if (!ev.victims || !ev.victims.length) {
+        floatText(ev.x, ev.y - 40, 'MISS', 0xaaaaaa, 26);
+        return;
+      }
+      SFX.hit();
+      for (const v of ev.victims) {
+        const c = chars.get(v.id);
+        if (!c) continue;
+        if (v.blocked) { flashTint(c, 0x9fd8ff); SFX.block(); floatText(c.x, c.y - 170, 'BLOCK', 0x9fd8ff, 22); }
+        else if (v.reflected) { spawnBurst(c.x, c.y - 100, 0xffffff, 12, 4); floatText(c.x, c.y - 170, 'REFLECT!', 0xffffff, 22); }
+        else { flashTint(c, 0xff5c5c); floatText(c.x, c.y - 170, '-' + v.dmg, 0xff6b6b, 26); }
+      }
+      return;
+    }
+    ball.x = from.x + (ev.x - from.x) * t;
+    ball.y = from.y + (ev.y - from.y) * t - Math.sin(t * Math.PI) * 120;
+  };
+  app.ticker.add(tick);
 });
 
 socket.on('bossSpawn', (b) => buildBoss(b));

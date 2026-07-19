@@ -77,7 +77,6 @@
   <h2 data-i18n="rulesTitle"></h2>
   <div class="grid2">
     <div><label data-i18n="likesToSpawn"></label><input type="number" id="likesToSpawn" min="1"></div>
-    <div><label data-i18n="likesPerGacha"></label><input type="number" id="likesPerGacha" min="1"></div>
     <div><label data-i18n="inactivitySeconds"></label><input type="number" id="inactivitySeconds" min="10"></div>
     <div><label data-i18n="startHP"></label><input type="number" id="startHP" min="10"></div>
   </div>
@@ -114,6 +113,12 @@
     <span class="st" id="st_background"></span>
     <button class="btn ghost" onclick="clearAsset('background')">✕</button>
   </div>
+  <label data-i18n="bossImg"></label>
+  <div class="fileRow">
+    <button class="btn ghost" onclick="pick('boss','.png,.jpg,.jpeg,.webp,image/*')" data-i18n="upload"></button>
+    <span class="st" id="st_boss"></span>
+    <button class="btn ghost" onclick="clearAsset('boss')">✕</button>
+  </div>
   <label data-i18n="spriteLabel"></label>
   <div id="spriteGrid"></div>
   <div class="note" data-i18n="spriteNote"></div>
@@ -131,7 +136,7 @@
 
 <script>
 const I18N = {
-  th:{ title:'ตั้งค่าเกม', bossTitle:'บอส', bossBaseHP:'HP บอสด่านแรก', bossHpMult:'ตัวคูณ HP ต่อด่าน (เช่น 1.5)', bossBaseDmg:'ดาเมจบอสด่านแรก', bossCooldown:'คูลดาวน์ท่าบอส (ต่ำสุด/สูงสุด วินาที)', gateTitle:'กรอกรหัสจากแอป Authenticator', gateBtn:'ปลดล็อก', gateErr:'รหัสไม่ถูกต้อง',
+  th:{ title:'ตั้งค่าเกม', bossTitle:'บอส', bossImg:'รูปบอส (PNG พื้นใส สูง ≥400px — ว่าง = มอนสเตอร์ในตัวเกม)', bossBaseHP:'HP บอสด่านแรก', bossHpMult:'ตัวคูณ HP ต่อด่าน (เช่น 1.5)', bossBaseDmg:'ดาเมจบอสด่านแรก', bossCooldown:'คูลดาวน์ท่าบอส (ต่ำสุด/สูงสุด วินาที)', gateTitle:'กรอกรหัสจากแอป Authenticator', gateBtn:'ปลดล็อก', gateErr:'รหัสไม่ถูกต้อง',
     rulesTitle:'กติกาเกม', likesToSpawn:'ไลค์เพื่อเกิดตัวละคร', likesPerGacha:'ไลค์ต่อกาชา 1 ครั้ง',
     inactivitySeconds:'ไม่กดไลค์เกิน (วินาที) = ตาย', startHP:'HP เริ่มต้น', basicAttackCost:'MP ต่อโจมตีธรรมดา',
     basicDmg:'ดาเมจธรรมดา (ต่ำสุด/สูงสุด)', giftTitle:'ช่วงเหรียญของขวัญ → ระดับกาชา',
@@ -141,7 +146,7 @@ const I18N = {
     notPersistent:'⚠️ ยังไม่ได้ตั้งค่า Supabase — ไฟล์นี้จะหายเมื่อ server restart',
     sounds:{ bgm:'เพลง Background (loop)', basic:'เสียงโจมตีธรรมดา', gacha:'เสียงหมุนกาชาปอง',
       spec_common:'Special — Common', spec_rare:'Special — Rare', spec_epic:'Special — Epic', spec_legendary:'Special — Legendary' } },
-  en:{ title:'Game Settings', bossTitle:'Boss', bossBaseHP:'Stage-1 boss HP', bossHpMult:'HP multiplier per stage (e.g. 1.5)', bossBaseDmg:'Stage-1 boss damage', bossCooldown:'Boss attack cooldown (min/max sec)', gateTitle:'Enter Authenticator code', gateBtn:'Unlock', gateErr:'Invalid code',
+  en:{ title:'Game Settings', bossTitle:'Boss', bossImg:'Boss image (transparent PNG, height ≥400px — empty = built-in monster)', bossBaseHP:'Stage-1 boss HP', bossHpMult:'HP multiplier per stage (e.g. 1.5)', bossBaseDmg:'Stage-1 boss damage', bossCooldown:'Boss attack cooldown (min/max sec)', gateTitle:'Enter Authenticator code', gateBtn:'Unlock', gateErr:'Invalid code',
     rulesTitle:'Game rules', likesToSpawn:'Likes to spawn', likesPerGacha:'Likes per gacha',
     inactivitySeconds:'Inactive seconds = death', startHP:'Starting HP', basicAttackCost:'MP per basic attack',
     basicDmg:'Basic damage (min/max)', giftTitle:'Gift coin ranges → gacha tier',
@@ -151,7 +156,7 @@ const I18N = {
     notPersistent:'⚠️ Supabase not configured — this file is lost on server restart',
     sounds:{ bgm:'Background music (loop)', basic:'Basic attack SFX', gacha:'Gacha roll SFX',
       spec_common:'Special — Common', spec_rare:'Special — Rare', spec_epic:'Special — Epic', spec_legendary:'Special — Legendary' } },
-  ja:{ title:'ゲーム設定', bossTitle:'ボス', bossBaseHP:'ステージ1のボスHP', bossHpMult:'ステージ毎HP倍率（例 1.5）', bossBaseDmg:'ステージ1のボス攻撃力', bossCooldown:'ボス攻撃クールダウン（最小/最大 秒）', gateTitle:'Authenticatorコードを入力', gateBtn:'解除', gateErr:'コードが違います',
+  ja:{ title:'ゲーム設定', bossTitle:'ボス', bossImg:'ボス画像（透過PNG、高さ400px以上 — 空欄＝内蔵モンスター）', bossBaseHP:'ステージ1のボスHP', bossHpMult:'ステージ毎HP倍率（例 1.5）', bossBaseDmg:'ステージ1のボス攻撃力', bossCooldown:'ボス攻撃クールダウン（最小/最大 秒）', gateTitle:'Authenticatorコードを入力', gateBtn:'解除', gateErr:'コードが違います',
     rulesTitle:'ゲームルール', likesToSpawn:'キャラ誕生いいね数', likesPerGacha:'ガチャ1回のいいね数',
     inactivitySeconds:'非アクティブ秒数＝死亡', startHP:'初期HP', basicAttackCost:'通常攻撃MP',
     basicDmg:'通常ダメージ（最小/最大）', giftTitle:'ギフトコイン → ガチャランク',
@@ -199,7 +204,7 @@ async function tryUnlock(){
 }
 
 /* ---------- load / render ---------- */
-const NUM_FIELDS = ['likesToSpawn','likesPerGacha','inactivitySeconds','startHP',
+const NUM_FIELDS = ['likesToSpawn','inactivitySeconds','startHP',
   'rareMin','epicMin','legendaryMin',
   'bossBaseHP','bossHpMult','bossBaseDmg','bossCooldownMin','bossCooldownMax'];
 async function load(){
@@ -212,6 +217,9 @@ function renderAssetStatus(){
   const el=document.getElementById('st_background');
   el.textContent = cfg.assets.background ? '✅' : '—';
   el.className = 'st' + (cfg.assets.background?' on':'');
+  const eb=document.getElementById('st_boss');
+  eb.textContent = cfg.assets.boss ? '✅' : '—';
+  eb.className = 'st' + (cfg.assets.boss?' on':'');
 }
 function renderSounds(){
   if(!cfg) return;
@@ -278,6 +286,7 @@ document.getElementById('filePicker').onchange=async (e)=>{
 };
 function setAsset(target,url){
   if(target==='background') cfg.assets.background=url;
+  else if(target==='boss') cfg.assets.boss=url;
   else if(target==='bgm') cfg.assets.bgm=url;
   else if(target.startsWith('sfx.')) cfg.assets.sfx[target.slice(4)]=url;
   else if(target.startsWith('sprites.')) cfg.assets.sprites[Number(target.slice(8))]=url;
