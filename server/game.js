@@ -51,7 +51,8 @@ function spawnBoss() {
 
 function pubBoss() {
   return boss && {
-    name: boss.name, level: boss.level, hp: Math.max(0, boss.hp), maxHp: boss.maxHp,
+    name: boss.name, level: boss.level, seed: boss.name + '-' + boss.level,
+    hp: Math.max(0, boss.hp), maxHp: boss.maxHp,
     mp: Math.round(boss.mp), maxMp: boss.maxMp, alive: boss.alive,
     x: boss.x, y: boss.y, stunned: boss.stunnedUntil > now()
   };
