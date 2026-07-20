@@ -26,7 +26,8 @@ const DEFAULTS = {
   },
   // ไฟล์ asset ที่อัปโหลด (URL) — null = ใช้ default ในตัว
   assets: {
-    background: null,
+    background: null,               // (เก่า) ฉากเดี่ยว — ใช้เป็น fallback
+    backgrounds: Array(20).fill(null), // สนามประลองสูงสุด 20 — สุ่มทุกด่านบอส
     boss: null,
     bgm: null,
     sfx: { basic: null, gacha: null, spec_common: null, spec_rare: null, spec_epic: null, spec_legendary: null },
