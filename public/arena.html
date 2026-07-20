@@ -482,13 +482,13 @@ function lerpColor(a, b, t) {
   return ((ar + (br - ar) * t) << 16) | ((ag + (bg - ag) * t) << 8) | (ab + (bb - ab) * t);
 }
 drawDefaultBg();
-function applyCustomBg() {
-  if (config && config.assets && config.assets.background) {
-    if (bgSprite) bgSprite.destroy();
-    bgSprite = PIXI.Sprite.from(config.assets.background);
+function setArenaBg(url) {
+  if (bgSprite) { bgSprite.destroy(); bgSprite = null; }
+  if (url) {
+    bgSprite = PIXI.Sprite.from(url);
     bgSprite.width = DW; bgSprite.height = DH;
     bgLayer.addChild(bgSprite);
-  } else if (bgSprite) { bgSprite.destroy(); bgSprite = null; }
+  } // ไม่มีรูป = ใช้ฉากกลางคืน default ที่วาดไว้
 }
 
 const charLayer = new PIXI.Container(); world.addChild(charLayer);
@@ -858,11 +858,11 @@ socket.on('connect', () => socket.emit('joinArena'));
 socket.on('init', (d) => {
   config = d.config;
   applyLang();
-  applyCustomBg();
+  setArenaBg(d.boss && d.boss.bg);
   d.players.forEach(addChar);
   if (d.boss && d.boss.alive) buildBoss(d.boss);
 });
-socket.on('configChanged', (c) => { config = c; applyLang(); applyCustomBg(); });
+socket.on('configChanged', (c) => { config = c; applyLang(); }); // ฉากใหม่จะถูกสุ่มใช้ตอนบอสตัวถัดไปเกิด
 socket.on('state', (snap) => {
   (snap.players || []).forEach(updateCharSafe);
   if (snap.boss) {
@@ -985,7 +985,7 @@ socket.on('bossStrike', (ev) => {
   app.ticker.add(tick);
 });
 
-socket.on('bossSpawn', (b) => buildBoss(b));
+socket.on('bossSpawn', (b) => { setArenaBg(b.bg); buildBoss(b); });
 
 socket.on('bossDefeated', (ev) => {
   bossDeathAnim();

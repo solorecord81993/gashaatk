@@ -32,6 +32,15 @@
   .fileRow .st{font-size:11.5px;color:var(--mut);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .fileRow .st.on{color:#3dff8b}
   input[type=file]{display:none}
+  #bgGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}
+  .slot{aspect-ratio:9/16;border:1px dashed rgba(203,184,255,.3);border-radius:12px;display:flex;
+    align-items:center;justify-content:center;font-size:18px;color:var(--mut);
+    cursor:pointer;overflow:hidden;background:#0d0726;position:relative}
+  .slot img{width:100%;height:100%;object-fit:cover}
+  .slot .num{position:absolute;top:3px;left:6px;font-size:10px;color:var(--neon-cyan);text-shadow:0 0 4px #000}
+  .slot .clear{position:absolute;top:2px;right:2px;background:#ff5c5c;color:#fff;border:none;border-radius:6px;
+    font-size:10px;padding:1px 5px;cursor:pointer;display:none;z-index:2}
+  .slot.has .clear{display:block}
   #gate{position:fixed;inset:0;background:var(--night);z-index:50;display:flex;flex-direction:column;
     align-items:center;justify-content:center;gap:14px;padding:30px}
   #gate .lock{font-size:52px}
@@ -99,11 +108,8 @@
 <div class="card">
   <h2 data-i18n="imgTitle"></h2>
   <label data-i18n="bgLabel"></label>
-  <div class="fileRow">
-    <button class="btn ghost" onclick="pick('background','.png,.jpg,.jpeg,.webp,image/*')" data-i18n="upload"></button>
-    <span class="st" id="st_background"></span>
-    <button class="btn ghost" onclick="clearAsset('background')">✕</button>
-  </div>
+  <div id="bgGrid"></div>
+  <div class="note" data-i18n="bgNote"></div>
 </div>
 
 <div class="card">
@@ -122,7 +128,7 @@ const I18N = {
     rulesTitle:'กติกาเกม', likesToSpawn:'ไลค์เพื่อเกิดตัวละคร', likesPerGacha:'ไลค์ต่อกาชา 1 ครั้ง',
     inactivitySeconds:'ไม่กดไลค์เกิน (วินาที) = ตาย', startHP:'HP เริ่มต้น', basicAttackCost:'MP ต่อโจมตีธรรมดา',
     basicDmg:'ดาเมจธรรมดา (ต่ำสุด/สูงสุด)', giftTitle:'ช่วงเหรียญของขวัญ → ระดับกาชา',
-    imgTitle:'ภาพ', bgLabel:'ฉากหลัง (แนวตั้ง 1000×1600)', spriteLabel:'Sprite ตัวละคร 20 ช่อง (PNG พื้นใส แนะนำสูง ≥200px)',
+    imgTitle:'ภาพ', bgLabel:'สนามประลอง (สูงสุด 20 ฉาก แนวตั้ง 1000×1600)', bgNote:'ระบบสุ่มสนามใหม่ทุกด่านบอสจากช่องที่มีรูป · มีกี่ช่องใช้เท่านั้น · ว่างหมด = ฉากกลางคืนในตัวเกม', spriteLabel:'Sprite ตัวละคร 20 ช่อง (PNG พื้นใส แนะนำสูง ≥200px)',
     spriteNote:'ช่องว่าง = ใช้ตัวละคร default ในตัวเกม · แตะช่องเพื่ออัปโหลด · ✕ เพื่อคืนค่า default',
     soundTitle:'เสียง (mp3/m4a)', upload:'อัปโหลด', save:'💾 บันทึกทั้งหมด', saved:'บันทึกแล้ว ✅',
     notPersistent:'⚠️ ยังไม่ได้ตั้งค่า Supabase — ไฟล์นี้จะหายเมื่อ server restart',
@@ -132,7 +138,7 @@ const I18N = {
     rulesTitle:'Game rules', likesToSpawn:'Likes to spawn', likesPerGacha:'Likes per gacha',
     inactivitySeconds:'Inactive seconds = death', startHP:'Starting HP', basicAttackCost:'MP per basic attack',
     basicDmg:'Basic damage (min/max)', giftTitle:'Gift coin ranges → gacha tier',
-    imgTitle:'Images', bgLabel:'Background (portrait 1000×1600)', spriteLabel:'Character sprites — 20 slots (transparent PNG, height ≥200px)',
+    imgTitle:'Images', bgLabel:'Arenas (up to 20, portrait 1000×1600)', bgNote:'A random arena is picked for every boss stage from filled slots · empty = built-in night scene', spriteLabel:'Character sprites — 20 slots (transparent PNG, height ≥200px)',
     spriteNote:'Empty slot = built-in default character · Tap a slot to upload · ✕ to reset',
     soundTitle:'Sounds (mp3/m4a)', upload:'Upload', save:'💾 Save all', saved:'Saved ✅',
     notPersistent:'⚠️ Supabase not configured — this file is lost on server restart',
@@ -142,7 +148,7 @@ const I18N = {
     rulesTitle:'ゲームルール', likesToSpawn:'キャラ誕生いいね数', likesPerGacha:'ガチャ1回のいいね数',
     inactivitySeconds:'非アクティブ秒数＝死亡', startHP:'初期HP', basicAttackCost:'通常攻撃MP',
     basicDmg:'通常ダメージ（最小/最大）', giftTitle:'ギフトコイン → ガチャランク',
-    imgTitle:'画像', bgLabel:'背景（縦 1000×1600）', spriteLabel:'キャラスプライト 20枠（透過PNG、高さ200px以上）',
+    imgTitle:'画像', bgLabel:'アリーナ（最大20、縦 1000×1600）', bgNote:'ボスのステージ毎に画像ありのスロットからランダムに選択 · 全て空欄＝内蔵の夜景', spriteLabel:'キャラスプライト 20枠（透過PNG、高さ200px以上）',
     spriteNote:'空欄＝内蔵デフォルトキャラ · タップでアップロード · ✕でリセット',
     soundTitle:'サウンド (mp3/m4a)', upload:'アップロード', save:'💾 すべて保存', saved:'保存しました ✅',
     notPersistent:'⚠️ Supabase未設定 — 再起動でファイルが消えます',
@@ -196,9 +202,18 @@ async function load(){
 }
 function renderAssetStatus(){
   if(!cfg) return;
-  const el=document.getElementById('st_background');
-  el.textContent = cfg.assets.background ? '✅' : '—';
-  el.className = 'st' + (cfg.assets.background?' on':'');
+  if(!Array.isArray(cfg.assets.backgrounds)) cfg.assets.backgrounds = Array(20).fill(null);
+  const grid=document.getElementById('bgGrid');
+  grid.innerHTML='';
+  for(let i=0;i<20;i++){
+    const url=cfg.assets.backgrounds[i];
+    const slot=document.createElement('div');
+    slot.className='slot'+(url?' has':'');
+    slot.innerHTML=`<span class="num">${i+1}</span>${url?`<img src="${url}">`:'🏞️'}<button class="clear">✕</button>`;
+    slot.onclick=()=>pick('bgs.'+i,'.png,.jpg,.jpeg,.webp,image/*');
+    slot.querySelector('.clear').onclick=(e)=>{e.stopPropagation();clearAsset('bgs.'+i);};
+    grid.appendChild(slot);
+  }
 }
 function renderSounds(){
   if(!cfg) return;
@@ -253,6 +268,10 @@ function setAsset(target,url){
   if(target==='background') cfg.assets.background=url;
   else if(target==='bgm') cfg.assets.bgm=url;
   else if(target.startsWith('sfx.')) cfg.assets.sfx[target.slice(4)]=url;
+  else if(target.startsWith('bgs.')){
+    if(!Array.isArray(cfg.assets.backgrounds)) cfg.assets.backgrounds = Array(20).fill(null);
+    cfg.assets.backgrounds[Number(target.slice(4))]=url;
+  }
   renderSounds(); renderAssetStatus();
 }
 function clearAsset(target){ setAsset(target,null); saveAssetsOnly(); }
