@@ -32,15 +32,6 @@
   .fileRow .st{font-size:11.5px;color:var(--mut);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .fileRow .st.on{color:#3dff8b}
   input[type=file]{display:none}
-  #spriteGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}
-  .slot{aspect-ratio:1;border:1px dashed rgba(203,184,255,.3);border-radius:12px;display:flex;
-    flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--mut);
-    cursor:pointer;overflow:hidden;background:#0d0726;position:relative}
-  .slot img{width:100%;height:100%;object-fit:contain}
-  .slot .num{position:absolute;top:3px;left:6px;font-size:10px;color:var(--neon-cyan)}
-  .slot .clear{position:absolute;top:2px;right:2px;background:#ff5c5c;color:#fff;border:none;border-radius:6px;
-    font-size:10px;padding:1px 5px;cursor:pointer;display:none}
-  .slot.has .clear{display:block}
   #gate{position:fixed;inset:0;background:var(--night);z-index:50;display:flex;flex-direction:column;
     align-items:center;justify-content:center;gap:14px;padding:30px}
   #gate .lock{font-size:52px}
@@ -113,15 +104,6 @@
     <span class="st" id="st_background"></span>
     <button class="btn ghost" onclick="clearAsset('background')">✕</button>
   </div>
-  <label data-i18n="bossImg"></label>
-  <div class="fileRow">
-    <button class="btn ghost" onclick="pick('boss','.png,.jpg,.jpeg,.webp,image/*')" data-i18n="upload"></button>
-    <span class="st" id="st_boss"></span>
-    <button class="btn ghost" onclick="clearAsset('boss')">✕</button>
-  </div>
-  <label data-i18n="spriteLabel"></label>
-  <div id="spriteGrid"></div>
-  <div class="note" data-i18n="spriteNote"></div>
 </div>
 
 <div class="card">
@@ -178,7 +160,7 @@ function applyLang(){
   document.getElementById('gateTitle').textContent = d().gateTitle;
   document.getElementById('totpBtn').textContent = d().gateBtn;
   document.getElementById('saveBtn').textContent = d().save;
-  renderSounds(); renderSprites(); renderAssetStatus();
+  renderSounds(); renderAssetStatus();
 }
 document.querySelectorAll('#langSwitch button').forEach(b=>b.onclick=()=>{
   lang=b.dataset.lang; localStorage.setItem('arenaLang',lang); applyLang();
@@ -210,16 +192,13 @@ const NUM_FIELDS = ['likesToSpawn','inactivitySeconds','startHP',
 async function load(){
   cfg = await (await fetch('/api/config')).json();
   NUM_FIELDS.forEach(k=>document.getElementById(k).value = cfg[k]);
-  renderSounds(); renderSprites(); renderAssetStatus();
+  renderSounds(); renderAssetStatus();
 }
 function renderAssetStatus(){
   if(!cfg) return;
   const el=document.getElementById('st_background');
   el.textContent = cfg.assets.background ? '✅' : '—';
   el.className = 'st' + (cfg.assets.background?' on':'');
-  const eb=document.getElementById('st_boss');
-  eb.textContent = cfg.assets.boss ? '✅' : '—';
-  eb.className = 'st' + (cfg.assets.boss?' on':'');
 }
 function renderSounds(){
   if(!cfg) return;
@@ -239,20 +218,6 @@ function renderSounds(){
     up.onclick=()=>pick(k==='bgm'?'bgm':'sfx.'+k,''); // ไม่จำกัดชนิด — iOS จะโชว์ทุกไฟล์ แล้วค่อยตรวจนามสกุลทีหลัง
     clr.onclick=()=>clearAsset(k==='bgm'?'bgm':'sfx.'+k);
     wrap.appendChild(row);
-  }
-}
-function renderSprites(){
-  if(!cfg) return;
-  const grid=document.getElementById('spriteGrid');
-  grid.innerHTML='';
-  for(let i=0;i<20;i++){
-    const url=cfg.assets.sprites[i];
-    const slot=document.createElement('div');
-    slot.className='slot'+(url?' has':'');
-    slot.innerHTML=`<span class="num">${i+1}</span>${url?`<img src="${url}">`:'📦'}<button class="clear">✕</button>`;
-    slot.onclick=()=>pick('sprites.'+i,'.png,.jpg,.jpeg,.webp,image/*');
-    slot.querySelector('.clear').onclick=(e)=>{e.stopPropagation();clearAsset('sprites.'+i);};
-    grid.appendChild(slot);
   }
 }
 
@@ -286,11 +251,9 @@ document.getElementById('filePicker').onchange=async (e)=>{
 };
 function setAsset(target,url){
   if(target==='background') cfg.assets.background=url;
-  else if(target==='boss') cfg.assets.boss=url;
   else if(target==='bgm') cfg.assets.bgm=url;
   else if(target.startsWith('sfx.')) cfg.assets.sfx[target.slice(4)]=url;
-  else if(target.startsWith('sprites.')) cfg.assets.sprites[Number(target.slice(8))]=url;
-  renderSounds(); renderSprites(); renderAssetStatus();
+  renderSounds(); renderAssetStatus();
 }
 function clearAsset(target){ setAsset(target,null); saveAssetsOnly(); }
 

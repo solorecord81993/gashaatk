@@ -512,7 +512,8 @@ function hsl(h, s, l) {
   const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
   return (Math.round(f(0) * 255) << 16) | (Math.round(f(8) * 255) << 8) | Math.round(f(4) * 255);
 }
-function buildCharacter(spriteIndex, customUrl) {
+function buildCharacter(seed) {
+  // Hero avatar จาก DiceBear (สไตล์ Big Smile) — seed = TikTok id ทำให้แต่ละคนได้หน้าเดิมเสมอ
   const c = new PIXI.Container();
   const body = new PIXI.Container();
   c.addChild(body);
@@ -522,46 +523,12 @@ function buildCharacter(spriteIndex, customUrl) {
   shadow.y = 4;
   c.addChildAt(shadow, 0);
 
-  if (customUrl) {
-    const sp = PIXI.Sprite.from(customUrl);
-    sp.anchor.set(.5, 1);
-    sp.texture.baseTexture.on('loaded', () => {
-      const sc = 140 / sp.texture.height;
-      sp.scale.set(sc);
-    });
-    if (sp.texture.baseTexture.valid) sp.scale.set(140 / sp.texture.height);
-    body.addChild(sp);
-  } else {
-    const p = palette(spriteIndex);
-    const g = new PIXI.Graphics();
-    // ขา 2 ข้าง
-    const legL = new PIXI.Graphics().beginFill(p.body2).drawRoundedRect(-6, 0, 12, 26, 6).endFill();
-    const legR = new PIXI.Graphics().beginFill(p.body2).drawRoundedRect(-6, 0, 12, 26, 6).endFill();
-    legL.x = -14; legR.x = 14; legL.y = legR.y = -26;
-    body.addChild(legL, legR);
-    c.legL = legL; c.legR = legR;
-    // ตัว
-    if (p.shape === 0) g.beginFill(p.body).drawRoundedRect(-32, -92, 64, 70, 22).endFill();
-    else if (p.shape === 1) g.beginFill(p.body).drawCircle(0, -58, 36).endFill();
-    else g.beginFill(p.body).moveTo(0, -96).lineTo(34, -24).lineTo(-34, -24).closePath().endFill();
-    // ท้อง
-    g.beginFill(0xffffff, .25).drawEllipse(0, -46, 20, 16).endFill();
-    // หัว
-    g.beginFill(p.head).drawCircle(0, -108, 26).endFill();
-    // ตา
-    g.beginFill(0x1a1030).drawCircle(-9, -112, 4.5).drawCircle(9, -112, 4.5).endFill();
-    g.beginFill(0xffffff).drawCircle(-7.5, -113.5, 1.6).drawCircle(10.5, -113.5, 1.6).endFill();
-    // ปาก
-    g.lineStyle(2.5, 0x1a1030).moveTo(-6, -100).quadraticCurveTo(0, -95, 6, -100).lineStyle(0);
-    // accessory
-    if (p.accessory === 1) { g.beginFill(p.acc).drawRoundedRect(-22, -140, 44, 12, 6).drawRoundedRect(-12, -152, 24, 16, 6).endFill(); }
-    else if (p.accessory === 2) { g.beginFill(p.acc).moveTo(-20,-128).lineTo(-30,-152).lineTo(-12,-132).closePath()
-      .moveTo(20,-128).lineTo(30,-152).lineTo(12,-132).closePath().endFill(); }
-    else if (p.accessory === 3) { g.lineStyle(4, p.acc).drawEllipse(0, -145, 18, 6).lineStyle(0); }
-    else if (p.accessory === 4) { g.lineStyle(3, p.acc).moveTo(0,-132).lineTo(0,-148).lineStyle(0)
-      .beginFill(p.acc).drawCircle(0,-152,5).endFill(); }
-    body.addChild(g);
-  }
+  const url = 'https://api.dicebear.com/9.x/big-smile/png?size=192&backgroundType=solid&backgroundColor=transparent&seed=' + encodeURIComponent(seed);
+  const sp = PIXI.Sprite.from(url);
+  sp.anchor.set(.5, 1);
+  const fit = () => { if (sp.texture.height > 2) sp.scale.set(150 / sp.texture.height); };
+  if (sp.texture.baseTexture.valid) fit(); else sp.texture.baseTexture.on('loaded', fit);
+  body.addChild(sp);
   return c;
 }
 
@@ -597,19 +564,16 @@ function buildBoss(b) {
   if (!b) return;
   bossData = b;
   if (bossC) { bossC.destroy({ children: true }); bossC = null; }
-  const customBoss = config && config.assets && config.assets.boss;
-  if (customBoss) {
-    bossC = new PIXI.Container();
-    const sh = new PIXI.Graphics().beginFill(0x000000, .4).drawEllipse(0, 12, 155, 34).endFill();
-    const sp = PIXI.Sprite.from(customBoss);
-    sp.anchor.set(.5, 1); sp.y = 14;
-    const fit = () => { if (sp.texture.height > 2) sp.scale.set(340 / sp.texture.height); };
-    if (sp.texture.baseTexture.valid) fit(); else sp.texture.baseTexture.on('loaded', fit);
-    bossC.addChild(sh, sp);
-    bossC.gfx = sp;
-  } else {
-    bossC = buildBossVisual(b.level);
-  }
+  // Boss avatar จาก DiceBear (สไตล์ Bottts) — seed ใหม่ทุกด่าน หน้าบอสเปลี่ยนทุกตัว
+  bossC = new PIXI.Container();
+  const sh = new PIXI.Graphics().beginFill(0x000000, .4).drawEllipse(0, 12, 165, 36).endFill();
+  const url = 'https://api.dicebear.com/9.x/bottts/png?size=320&seed=' + encodeURIComponent(b.seed || (b.name + '-' + b.level));
+  const sp = PIXI.Sprite.from(url);
+  sp.anchor.set(.5, 1); sp.y = 14;
+  const fit = () => { if (sp.texture.height > 2) sp.scale.set(330 / sp.texture.height); };
+  if (sp.texture.baseTexture.valid) fit(); else sp.texture.baseTexture.on('loaded', fit);
+  bossC.addChild(sh, sp);
+  bossC.gfx = sp;
   bossC.x = b.x; bossC.y = b.y;
   bossC.baseScale = Math.min(1.45, 1 + b.level * 0.03);
   bossC.animT = 0;
@@ -675,8 +639,7 @@ function makeBar(w, h, color) {
 }
 function addChar(d) {
   if (chars.has(d.id)) { updateChar(d); return; }
-  const custom = config && config.assets && config.assets.sprites[d.sprite];
-  const c = buildCharacter(d.sprite, custom);
+  const c = buildCharacter(d.id);
   c.x = d.x; c.y = d.y;
   c.tx = d.x; c.ty = d.y;
   c.zIndex = d.y;
